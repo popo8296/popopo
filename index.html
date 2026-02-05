@@ -222,6 +222,145 @@
             }
         }
         
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            animation: slideUp 0.3s;
+        }
+        
+        @keyframes slideUp {
+            from {
+                transform: translateY(100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .modal-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.5em;
+        }
+        
+        .close {
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            line-height: 32px;
+            text-align: center;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+        
+        .close:hover {
+            background: rgba(255,255,255,0.2);
+            transform: rotate(90deg);
+        }
+        
+        .modal-body {
+            padding: 30px;
+            max-height: calc(80vh - 100px);
+            overflow-y: auto;
+        }
+        
+        .detail-summary {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .detail-summary-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .detail-summary-item:last-child {
+            border-bottom: none;
+            font-weight: 600;
+            font-size: 1.1em;
+            color: #667eea;
+        }
+        
+        .detail-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        .detail-table th {
+            background: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+        }
+        
+        .detail-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .detail-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .clickable-product {
+            cursor: pointer;
+            color: #667eea;
+            transition: all 0.3s;
+        }
+        
+        .clickable-product:hover {
+            color: #764ba2;
+            text-decoration: underline;
+        }
+        
         .results {
             display: none;
         }
@@ -323,6 +462,17 @@
 <body>
     <div class="copy-notification" id="copyNotification">
         ✓ クリップボードにコピーしました！
+    </div>
+    
+    <div class="modal" id="detailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalProductName"></h2>
+                <button class="close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+            </div>
+        </div>
     </div>
     
     <div class="container">
@@ -581,7 +731,7 @@
                 tableHTML += `
                     <tr>
                         <td>${result.group === 1 ? 'ぽぽ' : 'ぽ'}</td>
-                        <td>${result.product}</td>
+                        <td class="clickable-product" onclick="showProductDetail('${result.product.replace(/'/g, "\\'")}', ${result.group})">${result.product}</td>
                         <td>${result.count}件</td>
                         <td class="amount-cell">¥${result.amount.toLocaleString()}</td>
                     </tr>
@@ -743,6 +893,100 @@
             setTimeout(() => {
                 notification.style.display = 'none';
             }, 3000);
+        }
+        
+        function showProductDetail(productName, group) {
+            // 該当商品のデータを取得
+            const productDetails = csvData.filter(row => row['商品名'] === productName);
+            
+            if (productDetails.length === 0) {
+                alert('商品データが見つかりません');
+                return;
+            }
+            
+            // 合計を計算
+            const totalAmount = productDetails.reduce((sum, row) => sum + (parseFloat(row['受取金額']) || 0), 0);
+            const totalCount = productDetails.length;
+            
+            // モーダルのタイトルを設定
+            document.getElementById('modalProductName').textContent = productName;
+            
+            // モーダルの内容を生成
+            let modalContent = `
+                <div class="detail-summary">
+                    <div class="detail-summary-item">
+                        <span>グループ:</span>
+                        <span><strong>${group === 1 ? 'ぽぽ' : 'ぽ'}</strong></span>
+                    </div>
+                    <div class="detail-summary-item">
+                        <span>総販売数:</span>
+                        <span><strong>${totalCount}件</strong></span>
+                    </div>
+                    <div class="detail-summary-item">
+                        <span>受取金額合計:</span>
+                        <span><strong>¥${totalAmount.toLocaleString()}</strong></span>
+                    </div>
+                </div>
+                
+                <h3 style="margin-bottom: 15px; color: #333;">注文詳細</h3>
+                <table class="detail-table">
+                    <thead>
+                        <tr>
+                            <th>注文日時</th>
+                            <th>注文番号</th>
+                            <th>バリエーション</th>
+                            <th>単価</th>
+                            <th>数量</th>
+                            <th>受取金額</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            // 注文データを日付順にソート
+            productDetails.sort((a, b) => {
+                return new Date(b['注文日時']) - new Date(a['注文日時']);
+            });
+            
+            productDetails.forEach(row => {
+                const orderDate = row['注文日時'] || '-';
+                const orderNumber = row['注文番号'] || '-';
+                const variation = row['バリエーション名'] || '-';
+                const price = row['単価'] || '0';
+                const quantity = row['数量'] || '0';
+                const amount = parseFloat(row['受取金額']) || 0;
+                
+                modalContent += `
+                    <tr>
+                        <td>${orderDate}</td>
+                        <td>${orderNumber}</td>
+                        <td>${variation}</td>
+                        <td>¥${parseFloat(price).toLocaleString()}</td>
+                        <td>${quantity}</td>
+                        <td style="font-weight: 600; color: #28a745;">¥${amount.toLocaleString()}</td>
+                    </tr>
+                `;
+            });
+            
+            modalContent += `
+                    </tbody>
+                </table>
+            `;
+            
+            document.getElementById('modalBody').innerHTML = modalContent;
+            document.getElementById('detailModal').style.display = 'block';
+        }
+        
+        function closeModal() {
+            document.getElementById('detailModal').style.display = 'none';
+        }
+        
+        // モーダル外をクリックしたら閉じる
+        window.onclick = function(event) {
+            const modal = document.getElementById('detailModal');
+            if (event.target === modal) {
+                closeModal();
+            }
         }
     </script>
 </body>
