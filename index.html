@@ -13,7 +13,7 @@
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #ADE0EE 0%, #73C2FB 100%);
             min-height: 100vh;
             padding: 20px;
         }
@@ -36,7 +36,7 @@
         
         .upload-section {
             background: #f8f9fa;
-            border: 2px dashed #667eea;
+            border: 2px dashed #73C2FB;
             border-radius: 12px;
             padding: 30px;
             text-align: center;
@@ -45,8 +45,8 @@
         }
         
         .upload-section:hover {
-            border-color: #764ba2;
-            background: #f0f1ff;
+            border-color: #73C2FB;
+            background: #ADE0EE;
         }
         
         .file-input-wrapper {
@@ -63,7 +63,7 @@
         label.file-label {
             display: inline-block;
             padding: 12px 30px;
-            background: #667eea;
+            background: #73C2FB;
             color: white;
             border-radius: 8px;
             cursor: pointer;
@@ -72,9 +72,9 @@
         }
         
         label.file-label:hover {
-            background: #764ba2;
+            background: #5AB3F5;
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 4px 12px rgba(115, 194, 251, 0.4);
         }
         
         .file-name {
@@ -100,13 +100,106 @@
         
         .product-group-item {
             display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 15px;
+            flex-direction: column;
+            padding: 20px;
             background: white;
             border-radius: 8px;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .product-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        
+        .ratio-controls {
+            display: none;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            margin-top: 10px;
+        }
+        
+        .ratio-controls.active {
+            display: flex;
+        }
+        
+        .ratio-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+            color: #666;
+            cursor: pointer;
+            padding: 5px 0;
+        }
+        
+        .ratio-toggle input[type="checkbox"] {
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+        }
+        
+        .ratio-slider-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .ratio-slider {
+            flex: 1;
+            height: 8px;
+            border-radius: 4px;
+            outline: none;
+            -webkit-appearance: none;
+            background: linear-gradient(to right, #667eea 0%, #667eea 50%, #764ba2 50%, #764ba2 100%);
+        }
+        
+        .ratio-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            border: 3px solid #73C2FB;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .ratio-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            border: 3px solid #73C2FB;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .ratio-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .ratio-display {
+            font-weight: 600;
+            color: #333;
+            min-width: 120px;
+            text-align: center;
+            background: white;
+            padding: 8px 15px;
+            border-radius: 6px;
+            border: 2px solid #73C2FB;
         }
         
         .product-name {
@@ -132,13 +225,13 @@
         }
         
         .group-btn:hover {
-            border-color: #667eea;
+            border-color: #73C2FB;
         }
         
         .group-btn.active {
-            background: #667eea;
+            background: #73C2FB;
             color: white;
-            border-color: #667eea;
+            border-color: #73C2FB;
         }
         
         .action-buttons {
@@ -165,36 +258,36 @@
         }
         
         .btn-primary {
-            background: #667eea;
+            background: #73C2FB;
             color: white;
         }
         
         .btn-primary:hover {
-            background: #764ba2;
+            background: #5AB3F5;
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 4px 12px rgba(115, 194, 251, 0.4);
         }
         
         .btn-secondary {
-            background: #28a745;
+            background: #ADE0EE;
             color: white;
         }
         
         .btn-secondary:hover {
-            background: #218838;
+            background: #9AD6E6;
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+            box-shadow: 0 4px 12px rgba(173, 224, 238, 0.4);
         }
         
         .btn-copy {
-            background: #17a2b8;
+            background: #73C2FB;
             color: white;
         }
         
         .btn-copy:hover {
-            background: #138496;
+            background: #5AB3F5;
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(23, 162, 184, 0.4);
+            box-shadow: 0 4px 12px rgba(115, 194, 251, 0.4);
         }
         
         .copy-notification {
@@ -264,7 +357,7 @@
         }
         
         .modal-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #73C2FB 0%, #ADE0EE 100%);
             color: white;
             padding: 25px 30px;
             display: flex;
@@ -322,7 +415,7 @@
             border-bottom: none;
             font-weight: 600;
             font-size: 1.1em;
-            color: #667eea;
+            color: #73C2FB;
         }
         
         .detail-table {
@@ -332,7 +425,7 @@
         }
         
         .detail-table th {
-            background: #667eea;
+            background: #73C2FB;
             color: white;
             padding: 12px;
             text-align: left;
@@ -352,12 +445,12 @@
         
         .clickable-product {
             cursor: pointer;
-            color: #667eea;
+            color: #73C2FB;
             transition: all 0.3s;
         }
         
         .clickable-product:hover {
-            color: #764ba2;
+            color: #5AB3F5;
             text-decoration: underline;
         }
         
@@ -379,7 +472,7 @@
         }
         
         .result-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #73C2FB 0%, #ADE0EE 100%);
             color: white;
             padding: 25px;
             border-radius: 12px;
@@ -414,7 +507,7 @@
         }
         
         th {
-            background: #667eea;
+            background: #73C2FB;
             color: white;
             padding: 15px;
             text-align: left;
@@ -461,7 +554,7 @@
 </head>
 <body>
     <div class="copy-notification" id="copyNotification">
-        ✓ クリップボードにコピーしました！
+        クリップボードにコピーしました
     </div>
     
     <div class="modal" id="detailModal">
@@ -476,18 +569,18 @@
     </div>
     
     <div class="container">
-        <h1>📊 売上集計ツール</h1>
+        <h1>売上集計ツール</h1>
         
         <div class="upload-section">
             <div class="file-input-wrapper">
                 <input type="file" id="csvFile" accept=".csv">
-                <label for="csvFile" class="file-label">📁 CSVファイルを選択</label>
+                <label for="csvFile" class="file-label">CSVファイルを選択</label>
             </div>
             <div class="file-name" id="fileName">ファイルが選択されていません</div>
         </div>
         
         <div class="group-assignment" id="groupAssignment">
-            <h2>📝 商品のグループ分け</h2>
+            <h2>商品のグループ分け</h2>
             <div id="productList"></div>
         </div>
         
@@ -497,13 +590,12 @@
                     振込手数料:
                 </label>
                 <input type="number" id="transferFee" value="200" 
-                       style="padding: 10px 20px; border: 2px solid #667eea; border-radius: 6px; font-size: 1em; width: 150px; text-align: right;">
+                       style="padding: 10px 20px; border: 2px solid #73C2FB; border-radius: 6px; font-size: 1em; width: 150px; text-align: right;">
                 <span style="margin-left: 5px; color: #666;">円</span>
             </div>
             <div class="button-row">
-                <button class="btn-primary" onclick="calculateResults()">💰 集計実行</button>
-                <button class="btn-copy" onclick="copyResultsAsText()">📋 テキストコピー</button>
-                <button class="btn-secondary" onclick="downloadResults()">💾 結果を保存</button>
+                <button class="btn-primary" onclick="calculateResults()">集計実行</button>
+                <button class="btn-copy" onclick="copyResultsAsText()">テキストコピー</button>
             </div>
         </div>
         
@@ -522,11 +614,14 @@
     <script>
         let csvData = [];
         let productGroups = {};
+        let productRatios = {}; // 商品ごとの利益分配割合（ぽぽ:ぽ）
         let results = [];
+        let originalFileName = '';
 
         document.getElementById('csvFile').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
+                originalFileName = file.name.replace('.csv', '');
                 document.getElementById('fileName').textContent = `選択されたファイル: ${file.name}`;
                 readCSV(file);
             }
@@ -556,15 +651,22 @@
                         headers.forEach((header, index) => {
                             row[header.replace(/^\uFEFF/, '').trim()] = values[index];
                         });
+                        
+                        // 受取金額が空欄の場合は0として扱う（同一注文内の2つ目以降の商品）
+                        if (!row['受取金額'] || row['受取金額'].trim() === '') {
+                            row['受取金額'] = '0';
+                        }
+                        
                         csvData.push(row);
                         uniqueProducts.add(row['商品名']);
                     }
                 }
             }
             
-            // デフォルトでグループ1に設定
+            // デフォルトでグループ1に設定、分配割合は50:50
             uniqueProducts.forEach(product => {
                 productGroups[product] = 1;
+                productRatios[product] = 50; // ぽぽの割合（%）
             });
             
             displayProductList(Array.from(uniqueProducts));
@@ -603,15 +705,38 @@
             productList.innerHTML = '';
             
             products.sort().forEach(product => {
+                const ratio = productRatios[product] || 50;
+                const popoRatio = ratio;
+                const poRatio = 100 - ratio;
+                const safeId = product.replace(/[^a-zA-Z0-9]/g, '_');
+                
                 const div = document.createElement('div');
                 div.className = 'product-group-item';
                 div.innerHTML = `
-                    <div class="product-name">${product}</div>
-                    <div class="group-selector">
-                        <button class="group-btn ${productGroups[product] === 1 ? 'active' : ''}" 
-                                onclick="setGroup('${product.replace(/'/g, "\\'")}', 1)">ぽぽ</button>
-                        <button class="group-btn ${productGroups[product] === 2 ? 'active' : ''}" 
-                                onclick="setGroup('${product.replace(/'/g, "\\'")}', 2)">ぽ</button>
+                    <div class="product-row">
+                        <div class="product-name">${product}</div>
+                        <div class="group-selector">
+                            <button class="group-btn ${productGroups[product] === 1 ? 'active' : ''}" 
+                                    onclick="setGroup('${product.replace(/'/g, "\\'")}', 1)">ぽぽ</button>
+                            <button class="group-btn ${productGroups[product] === 2 ? 'active' : ''}" 
+                                    onclick="setGroup('${product.replace(/'/g, "\\'")}', 2)">ぽ</button>
+                        </div>
+                    </div>
+                    <label class="ratio-toggle">
+                        <input type="checkbox" onchange="toggleRatioSlider('${safeId}')">
+                        利益分配割合を設定する
+                    </label>
+                    <div class="ratio-controls" id="ratio_${safeId}">
+                        <div style="min-width: 80px; font-weight: 600; color: #73C2FB;">利益分配:</div>
+                        <div class="ratio-slider-container">
+                            <input type="range" min="0" max="100" step="5" value="${ratio}" 
+                                   class="ratio-slider" id="slider_${safeId}"
+                                   oninput="updateRatio('${product.replace(/'/g, "\\'")}', this.value)"
+                                   style="background: linear-gradient(to right, #73C2FB 0%, #73C2FB ${ratio}%, #ADE0EE ${ratio}%, #ADE0EE 100%);">
+                        </div>
+                        <div class="ratio-display" id="display_${safeId}">
+                            ぽぽ ${popoRatio}% : ぽ ${poRatio}%
+                        </div>
                     </div>
                 `;
                 productList.appendChild(div);
@@ -619,6 +744,29 @@
             
             document.getElementById('groupAssignment').style.display = 'block';
             document.getElementById('actionButtons').style.display = 'flex';
+        }
+        
+        function toggleRatioSlider(safeId) {
+            const ratioControls = document.getElementById(`ratio_${safeId}`);
+            ratioControls.classList.toggle('active');
+        }
+        
+        function updateRatio(product, value) {
+            productRatios[product] = parseInt(value);
+            const popoRatio = parseInt(value);
+            const poRatio = 100 - popoRatio;
+            
+            const safeId = product.replace(/[^a-zA-Z0-9]/g, '_');
+            const display = document.getElementById(`display_${safeId}`);
+            const slider = document.getElementById(`slider_${safeId}`);
+            
+            if (display) {
+                display.textContent = `ぽぽ ${popoRatio}% : ぽ ${poRatio}%`;
+            }
+            
+            if (slider) {
+                slider.style.background = `linear-gradient(to right, #73C2FB 0%, #73C2FB ${value}%, #ADE0EE ${value}%, #ADE0EE 100%)`;
+            }
         }
 
         function setGroup(product, group) {
@@ -635,27 +783,82 @@
                 csvData.forEach(row => {
                     const productName = row['商品名'];
                     const amount = parseFloat(row['受取金額']) || 0;
-                    const group = productGroups[productName] || 1;
+                    const selectedGroup = productGroups[productName] || 1;
+                    const safeId = productName.replace(/[^a-zA-Z0-9]/g, '_');
+                    const ratioCheckbox = document.getElementById(`ratio_${safeId}`);
                     
-                    const key = `${productName}|||${group}`;
+                    // チェックボックスがONの場合は分配、OFFの場合は選択グループに100%
+                    const isRatioEnabled = ratioCheckbox && ratioCheckbox.classList.contains('active');
                     
-                    if (!aggregation[key]) {
-                        aggregation[key] = {
-                            product: productName,
-                            group: group,
-                            amount: 0,
-                            count: 0
-                        };
+                    if (isRatioEnabled) {
+                        // 利益分配割合を適用
+                        const ratio = productRatios[productName] || 50;
+                        const popoAmount = amount * (ratio / 100);
+                        const poAmount = amount * ((100 - ratio) / 100);
+                        
+                        // ぽぽの集計
+                        if (popoAmount > 0) {
+                            const popoKey = `${productName}|||1`;
+                            if (!aggregation[popoKey]) {
+                                aggregation[popoKey] = {
+                                    product: productName,
+                                    group: 1,
+                                    amount: 0,
+                                    count: 0,
+                                    ratio: ratio,
+                                    isDivided: true
+                                };
+                            }
+                            if (amount > 0) {
+                                aggregation[popoKey].amount += popoAmount;
+                                aggregation[popoKey].count += 1;
+                            }
+                        }
+                        
+                        // ぽの集計
+                        if (poAmount > 0) {
+                            const poKey = `${productName}|||2`;
+                            if (!aggregation[poKey]) {
+                                aggregation[poKey] = {
+                                    product: productName,
+                                    group: 2,
+                                    amount: 0,
+                                    count: 0,
+                                    ratio: 100 - ratio,
+                                    isDivided: true
+                                };
+                            }
+                            if (amount > 0) {
+                                aggregation[poKey].amount += poAmount;
+                                aggregation[poKey].count += 1;
+                            }
+                        }
+                    } else {
+                        // 選択グループに100%
+                        const key = `${productName}|||${selectedGroup}`;
+                        if (!aggregation[key]) {
+                            aggregation[key] = {
+                                product: productName,
+                                group: selectedGroup,
+                                amount: 0,
+                                count: 0,
+                                ratio: 100,
+                                isDivided: false
+                            };
+                        }
+                        if (amount > 0) {
+                            aggregation[key].amount += amount;
+                            aggregation[key].count += 1;
+                        }
                     }
-                    
-                    aggregation[key].amount += amount;
-                    aggregation[key].count += 1;
                 });
                 
-                results = Object.values(aggregation).sort((a, b) => {
-                    if (a.group !== b.group) return a.group - b.group;
-                    return b.amount - a.amount;
-                });
+                results = Object.values(aggregation)
+                    .filter(r => r.amount > 0) // 金額が0より大きいもののみ
+                    .sort((a, b) => {
+                        if (a.group !== b.group) return a.group - b.group;
+                        return b.amount - a.amount;
+                    });
                 
                 displayResults();
                 document.getElementById('loading').style.display = 'none';
@@ -690,8 +893,9 @@
                     <div class="result-detail" style="margin-top: 10px; font-size: 0.95em;">
                         売上割合: ${(group1Ratio * 100).toFixed(1)}%<br>
                         振込手数料: -¥${Math.round(group1Fee).toLocaleString()}<br>
-                        <strong style="font-size: 1.1em;">手取り: ¥${Math.round(group1Net).toLocaleString()}</strong>
+                        <strong style="font-size: 1.1em;">受取金額: ¥${Math.floor(group1Net).toLocaleString()}</strong>
                     </div>
+                    <button onclick="downloadGroupCSV(1)" style="margin-top: 15px; padding: 10px 20px; background: white; color: #73C2FB; border: 2px solid white; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; transition: all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.9)'" onmouseout="this.style.background='white'">CSVを保存</button>
                 </div>
                 <div class="result-card">
                     <h3>ぽ 合計</h3>
@@ -700,8 +904,9 @@
                     <div class="result-detail" style="margin-top: 10px; font-size: 0.95em;">
                         売上割合: ${(group2Ratio * 100).toFixed(1)}%<br>
                         振込手数料: -¥${Math.round(group2Fee).toLocaleString()}<br>
-                        <strong style="font-size: 1.1em;">手取り: ¥${Math.round(group2Net).toLocaleString()}</strong>
+                        <strong style="font-size: 1.1em;">受取金額: ¥${Math.floor(group2Net).toLocaleString()}</strong>
                     </div>
+                    <button onclick="downloadGroupCSV(2)" style="margin-top: 15px; padding: 10px 20px; background: white; color: #73C2FB; border: 2px solid white; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; transition: all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.9)'" onmouseout="this.style.background='white'">CSVを保存</button>
                 </div>
                 <div class="result-card">
                     <h3>総合計</h3>
@@ -709,8 +914,9 @@
                     <div class="result-detail">${results.length}商品</div>
                     <div class="result-detail" style="margin-top: 10px; font-size: 0.95em;">
                         振込手数料合計: ¥${transferFee.toLocaleString()}<br>
-                        <strong style="font-size: 1.1em;">総手取り: ¥${Math.round(grandTotal - transferFee).toLocaleString()}</strong>
+                        <strong style="font-size: 1.1em;">受取金額: ¥${Math.floor(grandTotal - transferFee).toLocaleString()}</strong>
                     </div>
+                    <button onclick="downloadResultsSummary()" style="margin-top: 15px; padding: 10px 20px; background: white; color: #73C2FB; border: 2px solid white; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; transition: all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.9)'" onmouseout="this.style.background='white'">集計結果を保存</button>
                 </div>
             `;
             
@@ -720,6 +926,7 @@
                     <tr>
                         <th>グループ</th>
                         <th>商品名</th>
+                        <th>分配割合</th>
                         <th>販売数</th>
                         <th>受取金額合計</th>
                     </tr>
@@ -728,12 +935,14 @@
             `;
             
             results.forEach(result => {
+                const ratioText = result.isDivided ? `${result.ratio}%` : '100%';
                 tableHTML += `
                     <tr>
                         <td>${result.group === 1 ? 'ぽぽ' : 'ぽ'}</td>
                         <td class="clickable-product" onclick="showProductDetail('${result.product.replace(/'/g, "\\'")}', ${result.group})">${result.product}</td>
+                        <td>${ratioText}</td>
                         <td>${result.count}件</td>
-                        <td class="amount-cell">¥${result.amount.toLocaleString()}</td>
+                        <td class="amount-cell">¥${Math.floor(result.amount).toLocaleString()}</td>
                     </tr>
                 `;
             });
@@ -743,14 +952,15 @@
             document.getElementById('results').style.display = 'block';
         }
 
-        function downloadResults() {
+        function downloadResultsSummary() {
             const transferFee = parseFloat(document.getElementById('transferFee').value) || 0;
             
-            let csv = 'グループ,商品名,販売数,受取金額合計\n';
+            let csv = 'グループ,商品名,分配割合,販売数,受取金額合計\n';
             
             results.forEach(result => {
                 const groupName = result.group === 1 ? 'ぽぽ' : 'ぽ';
-                csv += `${groupName},"${result.product}",${result.count},${result.amount}\n`;
+                const ratioText = result.isDivided ? `${result.ratio}%` : '100%';
+                csv += `${groupName},"${result.product}",${ratioText},${result.count},${Math.floor(result.amount)}\n`;
             });
             
             // サマリー行を追加
@@ -771,22 +981,143 @@
             csv += `ぽぽ合計,,${results.filter(r => r.group === 1).reduce((sum, r) => sum + r.count, 0)},${group1Total}\n`;
             csv += `ぽぽ売上割合,,,${(group1Ratio * 100).toFixed(1)}%\n`;
             csv += `ぽぽ振込手数料負担,,,-${group1Fee}\n`;
-            csv += `ぽぽ手取り,,,${group1Net}\n`;
+            csv += `ぽぽ受取金額,,,${Math.floor(group1Net)}\n`;
             csv += '\n';
             csv += `ぽ合計,,${results.filter(r => r.group === 2).reduce((sum, r) => sum + r.count, 0)},${group2Total}\n`;
             csv += `ぽ売上割合,,,${(group2Ratio * 100).toFixed(1)}%\n`;
             csv += `ぽ振込手数料負担,,,-${group2Fee}\n`;
-            csv += `ぽ手取り,,,${group2Net}\n`;
+            csv += `ぽ受取金額,,,${Math.floor(group2Net)}\n`;
             csv += '\n';
             csv += `総合計,,${results.reduce((sum, r) => sum + r.count, 0)},${grandTotal}\n`;
             csv += `振込手数料合計,,,-${transferFee}\n`;
-            csv += `総手取り,,,${grandTotal - transferFee}\n`;
+            csv += `受取金額,,,${Math.floor(grandTotal - transferFee)}\n`;
             
             const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             const url = URL.createObjectURL(blob);
             link.setAttribute('href', url);
-            link.setAttribute('download', `集計結果_${new Date().toISOString().split('T')[0]}.csv`);
+            link.setAttribute('download', `${originalFileName}_集計結果.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        function downloadGroupCSV(group) {
+            if (csvData.length === 0) {
+                alert('まずCSVファイルを読み込んでください');
+                return;
+            }
+            
+            const groupName = group === 1 ? 'ぽぽ' : 'ぽ';
+            
+            // ヘッダー行を取得（元のCSVと同じ順序）
+            const headers = Object.keys(csvData[0]);
+            
+            // グループに属する商品のデータのみフィルタリング
+            const groupData = csvData.filter(row => {
+                const productName = row['商品名'];
+                const amount = parseFloat(row['受取金額']) || 0;
+                
+                if (amount > 0) {
+                    const safeId = productName.replace(/[^a-zA-Z0-9]/g, '_');
+                    const ratioControls = document.getElementById(`ratio_${safeId}`);
+                    const isRatioEnabled = ratioControls && ratioControls.classList.contains('active');
+                    
+                    if (isRatioEnabled) {
+                        // 分配設定がある場合は割合に応じて判定
+                        const ratio = productRatios[productName] || 50;
+                        const popoRatio = ratio;
+                        const poRatio = 100 - ratio;
+                        
+                        if (group === 1) {
+                            return popoRatio > 0;
+                        } else {
+                            return poRatio > 0;
+                        }
+                    } else {
+                        // 分配設定がない場合は選択グループのみ
+                        const selectedGroup = productGroups[productName] || 1;
+                        return selectedGroup === group;
+                    }
+                }
+                return false;
+            });
+            
+            if (groupData.length === 0) {
+                alert(`${groupName}に割り当てられた商品がありません`);
+                return;
+            }
+            
+            // CSV文字列を生成
+            let csv = '';
+            
+            // ヘッダー行（分配割合と分配後金額を追加）
+            csv += headers.map(h => `"${h}"`).join(',') + ',"利益分配割合","分配後受取金額"\n';
+            
+            // データ行
+            groupData.forEach(row => {
+                const productName = row['商品名'];
+                const originalAmount = parseFloat(row['受取金額']) || 0;
+                const safeId = productName.replace(/[^a-zA-Z0-9]/g, '_');
+                const ratioControls = document.getElementById(`ratio_${safeId}`);
+                const isRatioEnabled = ratioControls && ratioControls.classList.contains('active');
+                
+                let groupRatio, distributedAmount, ratioLabel;
+                
+                if (isRatioEnabled) {
+                    // 分配設定がある場合
+                    const ratio = productRatios[productName] || 50;
+                    groupRatio = group === 1 ? ratio : (100 - ratio);
+                    distributedAmount = Math.floor(originalAmount * (groupRatio / 100));
+                    ratioLabel = `${groupName} ${groupRatio}%`;
+                } else {
+                    // 分配設定がない場合は100%
+                    groupRatio = 100;
+                    distributedAmount = originalAmount;
+                    ratioLabel = `${groupName} 100%`;
+                }
+                
+                const values = headers.map(header => {
+                    const value = row[header] || '';
+                    // 値にカンマや改行が含まれる場合はダブルクォートで囲む
+                    if (value.includes(',') || value.includes('\n') || value.includes('"')) {
+                        return `"${value.replace(/"/g, '""')}"`;
+                    }
+                    return `"${value}"`;
+                });
+                csv += values.join(',') + `,"${ratioLabel}","${distributedAmount}"\n`;
+            });
+            
+            // 合計行を追加
+            const transferFee = parseFloat(document.getElementById('transferFee').value) || 0;
+            const group1Total = results.filter(r => r.group === 1).reduce((sum, r) => sum + r.amount, 0);
+            const group2Total = results.filter(r => r.group === 2).reduce((sum, r) => sum + r.amount, 0);
+            const grandTotal = group1Total + group2Total;
+            
+            const groupTotal = group === 1 ? group1Total : group2Total;
+            const groupRatio = grandTotal > 0 ? groupTotal / grandTotal : 0;
+            const groupFee = Math.round(transferFee * groupRatio);
+            const groupNet = groupTotal - groupFee;
+            const groupCount = groupData.reduce((sum, row) => {
+                const amount = parseFloat(row['受取金額']) || 0;
+                return amount > 0 ? sum + 1 : sum;
+            }, 0);
+            
+            csv += '\n';
+            csv += `"${groupName} 集計サマリー"\n`;
+            csv += `"販売数","${groupCount}件"\n`;
+            csv += `"受取金額合計","${groupTotal}円"\n`;
+            csv += `"売上割合","${(groupRatio * 100).toFixed(1)}%"\n`;
+            csv += `"振込手数料負担","-${groupFee}円"\n`;
+            csv += `"受取金額","${Math.floor(groupNet)}円"\n`;
+            
+            // ダウンロード
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `${originalFileName}_${groupName}合計.csv`);
             link.style.visibility = 'hidden';
             document.body.appendChild(link);
             link.click();
@@ -817,7 +1148,7 @@
             
             // テキスト生成
             let text = '━━━━━━━━━━━━━━━━━━━━\n';
-            text += '📊 売上集計結果\n';
+            text += '売上集計結果\n';
             text += '━━━━━━━━━━━━━━━━━━━━\n\n';
             
             // ぽぽの集計
@@ -825,7 +1156,7 @@
             text += `売上合計: ¥${group1Total.toLocaleString()}\n`;
             text += `売上割合: ${(group1Ratio * 100).toFixed(1)}%\n`;
             text += `振込手数料: -¥${group1Fee.toLocaleString()}\n`;
-            text += `手取り: ¥${group1Net.toLocaleString()}\n`;
+            text += `受取金額: ¥${Math.floor(group1Net).toLocaleString()}\n`;
             text += `商品数: ${results.filter(r => r.group === 1).length}商品\n\n`;
             
             // ぽぽの商品詳細
@@ -846,7 +1177,7 @@
             text += `売上合計: ¥${group2Total.toLocaleString()}\n`;
             text += `売上割合: ${(group2Ratio * 100).toFixed(1)}%\n`;
             text += `振込手数料: -¥${group2Fee.toLocaleString()}\n`;
-            text += `手取り: ¥${group2Net.toLocaleString()}\n`;
+            text += `受取金額: ¥${Math.floor(group2Net).toLocaleString()}\n`;
             text += `商品数: ${results.filter(r => r.group === 2).length}商品\n\n`;
             
             // ぽの商品詳細
@@ -866,7 +1197,7 @@
             text += '【総合計】\n';
             text += `総売上: ¥${grandTotal.toLocaleString()}\n`;
             text += `振込手数料: -¥${transferFee.toLocaleString()}\n`;
-            text += `総手取り: ¥${(grandTotal - transferFee).toLocaleString()}\n`;
+            text += `受取金額: ¥${Math.floor(grandTotal - transferFee).toLocaleString()}\n`;
             text += `総商品数: ${results.length}商品\n`;
             text += `総販売数: ${results.reduce((sum, r) => sum + r.count, 0)}件\n`;
             
