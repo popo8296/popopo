@@ -49,6 +49,55 @@
             background: #ADE0EE;
         }
         
+        .file-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: white;
+            border-radius: 8px;
+            padding: 10px 15px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+        
+        .file-row .file-label-small {
+            display: inline-block;
+            padding: 7px 16px;
+            background: #73C2FB;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9em;
+            white-space: nowrap;
+            transition: all 0.3s;
+        }
+        
+        .file-row .file-label-small:hover {
+            background: #5AB3F5;
+        }
+        
+        .file-row .file-name-inline {
+            flex: 1;
+            color: #555;
+            font-size: 0.9em;
+            text-align: left;
+        }
+        
+        .file-row .remove-btn {
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 1.3em;
+            cursor: pointer;
+            padding: 0 5px;
+            line-height: 1;
+            transition: color 0.2s;
+        }
+        
+        .file-row .remove-btn:hover {
+            color: #e74c3c;
+        }
+        
         .file-input-wrapper {
             position: relative;
             display: inline-block;
@@ -572,11 +621,8 @@
         <h1>売上集計ツール</h1>
         
         <div class="upload-section">
-            <div class="file-input-wrapper">
-                <input type="file" id="csvFile" accept=".csv">
-                <label for="csvFile" class="file-label">CSVファイルを選択</label>
-            </div>
-            <div class="file-name" id="fileName">ファイルが選択されていません</div>
+            <div id="fileInputList" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;"></div>
+            <button class="btn-primary" onclick="addFileInput()" style="padding: 10px 25px; font-size: 0.95em;">CSVファイルを追加</button>
         </div>
         
         <div class="group-assignment" id="groupAssignment">
@@ -614,35 +660,102 @@
     <script>
         let csvData = [];
         let productGroups = {};
-        let productRatios = {}; // 商品ごとの利益分配割合（ぽぽ:ぽ）
+        let productRatios = {};
         let results = [];
-        let originalFileName = '';
+        let rawDataMap = {}; // fileId -> rows
+        let fileCounter = 0;
+        let fileNames = [];
 
-        document.getElementById('csvFile').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                originalFileName = file.name.replace('.csv', '');
-                document.getElementById('fileName').textContent = `選択されたファイル: ${file.name}`;
-                readCSV(file);
-            }
-        });
+        // 初期化：最初の1行を自動追加
+        window.addEventListener('DOMContentLoaded', () => addFileInput());
 
-        function readCSV(file) {
+        function addFileInput() {
+            fileCounter++;
+            const id = fileCounter;
+            const container = document.getElementById('fileInputList');
+
+            const row = document.createElement('div');
+            row.className = 'file-row';
+            row.id = `fileRow_${id}`;
+
+            row.innerHTML = `
+                <input type="file" id="csvInput_${id}" accept=".csv" style="display:none;">
+                <label for="csvInput_${id}" class="file-label-small">ファイル ${id} を選択</label>
+                <span class="file-name-inline" id="fileNameLabel_${id}">選択されていません</span>
+                <button class="remove-btn" onclick="removeFileInput(${id})" title="削除">&times;</button>
+            `;
+
+            container.appendChild(row);
+
+            document.getElementById(`csvInput_${id}`).addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                document.getElementById(`fileNameLabel_${id}`).textContent = file.name;
+                readFileIntoMap(file, id);
+            });
+        }
+
+        function removeFileInput(id) {
+            const row = document.getElementById(`fileRow_${id}`);
+            if (row) row.remove();
+            delete rawDataMap[id];
+            rebuildCsvData();
+        }
+
+        function readFileIntoMap(file, id) {
             const reader = new FileReader();
             reader.onload = function(e) {
-                const text = e.target.result;
-                parseCSV(text);
+                rawDataMap[id] = { name: file.name.replace('.csv', ''), rows: parseCSVToRows(e.target.result) };
+                rebuildCsvData();
             };
             reader.readAsText(file, 'UTF-8');
         }
 
-        function parseCSV(text) {
+        // 商品IDごとの代表名（最初に登場した名前を使用）
+        let productIdToName = {};
+
+        function rebuildCsvData() {
+            csvData = [];
+            fileNames = [];
+            Object.values(rawDataMap).forEach(f => {
+                csvData = csvData.concat(f.rows);
+                fileNames.push(f.name);
+            });
+            originalFileName = fileNames.join('_');
+
+            // 商品IDで名前を統一（最初に登場した名前を代表名にする）
+            csvData.forEach(row => {
+                const pid = row['商品ID'];
+                if (pid && !productIdToName[pid]) {
+                    productIdToName[pid] = row['商品名'];
+                }
+            });
+
+            // 全行の商品名を代表名に統一
+            csvData.forEach(row => {
+                const pid = row['商品ID'];
+                if (pid && productIdToName[pid]) {
+                    row['商品名'] = productIdToName[pid];
+                }
+            });
+
+            const uniqueProducts = new Set();
+            csvData.forEach(row => uniqueProducts.add(row['商品名']));
+
+            // 新商品だけデフォルト設定（既存設定は保持）
+            uniqueProducts.forEach(product => {
+                if (productGroups[product] === undefined) productGroups[product] = 1;
+                if (productRatios[product] === undefined) productRatios[product] = 50;
+            });
+
+            displayProductList(Array.from(uniqueProducts));
+        }
+
+        function parseCSVToRows(text) {
             const lines = text.split('\n');
             const headers = parseCSVLine(lines[0]);
-            
-            csvData = [];
-            const uniqueProducts = new Set();
-            
+            const rows = [];
+
             for (let i = 1; i < lines.length; i++) {
                 if (lines[i].trim()) {
                     const values = parseCSVLine(lines[i]);
@@ -651,25 +764,14 @@
                         headers.forEach((header, index) => {
                             row[header.replace(/^\uFEFF/, '').trim()] = values[index];
                         });
-                        
-                        // 受取金額が空欄の場合は0として扱う（同一注文内の2つ目以降の商品）
                         if (!row['受取金額'] || row['受取金額'].trim() === '') {
                             row['受取金額'] = '0';
                         }
-                        
-                        csvData.push(row);
-                        uniqueProducts.add(row['商品名']);
+                        rows.push(row);
                     }
                 }
             }
-            
-            // デフォルトでグループ1に設定、分配割合は50:50
-            uniqueProducts.forEach(product => {
-                productGroups[product] = 1;
-                productRatios[product] = 50; // ぽぽの割合（%）
-            });
-            
-            displayProductList(Array.from(uniqueProducts));
+            return rows;
         }
 
         function parseCSVLine(line) {
@@ -783,78 +885,58 @@
                 csvData.forEach(row => {
                     const productName = row['商品名'];
                     const amount = parseFloat(row['受取金額']) || 0;
+                    const subtotal = parseFloat(row['小計']) || 0;
                     const selectedGroup = productGroups[productName] || 1;
                     const safeId = productName.replace(/[^a-zA-Z0-9]/g, '_');
                     const ratioCheckbox = document.getElementById(`ratio_${safeId}`);
                     
-                    // チェックボックスがONの場合は分配、OFFの場合は選択グループに100%
                     const isRatioEnabled = ratioCheckbox && ratioCheckbox.classList.contains('active');
                     
                     if (isRatioEnabled) {
-                        // 利益分配割合を適用
                         const ratio = productRatios[productName] || 50;
                         const popoAmount = amount * (ratio / 100);
                         const poAmount = amount * ((100 - ratio) / 100);
+                        const popoSubtotal = subtotal * (ratio / 100);
+                        const poSubtotal = subtotal * ((100 - ratio) / 100);
                         
-                        // ぽぽの集計
-                        if (popoAmount > 0) {
+                        if (popoAmount > 0 || popoSubtotal > 0) {
                             const popoKey = `${productName}|||1`;
                             if (!aggregation[popoKey]) {
-                                aggregation[popoKey] = {
-                                    product: productName,
-                                    group: 1,
-                                    amount: 0,
-                                    count: 0,
-                                    ratio: ratio,
-                                    isDivided: true
-                                };
+                                aggregation[popoKey] = { product: productName, group: 1, amount: 0, subtotal: 0, count: 0, ratio: ratio, isDivided: true };
                             }
-                            if (amount > 0) {
+                            if (amount > 0 || subtotal > 0) {
                                 aggregation[popoKey].amount += popoAmount;
+                                aggregation[popoKey].subtotal += popoSubtotal;
                                 aggregation[popoKey].count += 1;
                             }
                         }
                         
-                        // ぽの集計
-                        if (poAmount > 0) {
+                        if (poAmount > 0 || poSubtotal > 0) {
                             const poKey = `${productName}|||2`;
                             if (!aggregation[poKey]) {
-                                aggregation[poKey] = {
-                                    product: productName,
-                                    group: 2,
-                                    amount: 0,
-                                    count: 0,
-                                    ratio: 100 - ratio,
-                                    isDivided: true
-                                };
+                                aggregation[poKey] = { product: productName, group: 2, amount: 0, subtotal: 0, count: 0, ratio: 100 - ratio, isDivided: true };
                             }
-                            if (amount > 0) {
+                            if (amount > 0 || subtotal > 0) {
                                 aggregation[poKey].amount += poAmount;
+                                aggregation[poKey].subtotal += poSubtotal;
                                 aggregation[poKey].count += 1;
                             }
                         }
                     } else {
-                        // 選択グループに100%
                         const key = `${productName}|||${selectedGroup}`;
                         if (!aggregation[key]) {
-                            aggregation[key] = {
-                                product: productName,
-                                group: selectedGroup,
-                                amount: 0,
-                                count: 0,
-                                ratio: 100,
-                                isDivided: false
-                            };
+                            aggregation[key] = { product: productName, group: selectedGroup, amount: 0, subtotal: 0, count: 0, ratio: 100, isDivided: false };
                         }
-                        if (amount > 0) {
+                        if (amount > 0 || subtotal > 0) {
                             aggregation[key].amount += amount;
+                            aggregation[key].subtotal += subtotal;
                             aggregation[key].count += 1;
                         }
                     }
                 });
                 
                 results = Object.values(aggregation)
-                    .filter(r => r.amount > 0) // 金額が0より大きいもののみ
+                    .filter(r => r.amount > 0 || r.subtotal > 0)
                     .sort((a, b) => {
                         if (a.group !== b.group) return a.group - b.group;
                         return b.amount - a.amount;
@@ -866,15 +948,27 @@
         }
 
         function displayResults() {
-            // 振込手数料を取得
             const transferFee = parseFloat(document.getElementById('transferFee').value) || 0;
             
-            // サマリーカード
-            const group1Total = results.filter(r => r.group === 1).reduce((sum, r) => sum + r.amount, 0);
-            const group2Total = results.filter(r => r.group === 2).reduce((sum, r) => sum + r.amount, 0);
+            const group1Results = results.filter(r => r.group === 1);
+            const group2Results = results.filter(r => r.group === 2);
+
+            const group1Total = group1Results.reduce((sum, r) => sum + r.amount, 0);
+            const group2Total = group2Results.reduce((sum, r) => sum + r.amount, 0);
             const grandTotal = group1Total + group2Total;
-            
-            // 振込手数料を割合で分配
+
+            const group1Subtotal = group1Results.reduce((sum, r) => sum + r.subtotal, 0);
+            const group2Subtotal = group2Results.reduce((sum, r) => sum + r.subtotal, 0);
+            const grandSubtotal = group1Subtotal + group2Subtotal;
+
+            const group1BoothFee = group1Subtotal - group1Total;
+            const group2BoothFee = group2Subtotal - group2Total;
+            const grandBoothFee = grandSubtotal - grandTotal;
+
+            const group1Count = group1Results.reduce((sum, r) => sum + r.count, 0);
+            const group2Count = group2Results.reduce((sum, r) => sum + r.count, 0);
+            const grandCount = group1Count + group2Count;
+
             const group1Ratio = grandTotal > 0 ? group1Total / grandTotal : 0;
             const group2Ratio = grandTotal > 0 ? group2Total / grandTotal : 0;
             
@@ -883,40 +977,61 @@
             
             const group1Net = group1Total - group1Fee;
             const group2Net = group2Total - group2Fee;
-            
+
+            const cardStyle = `style="margin-top: 15px; padding: 10px 20px; background: white; color: #73C2FB; border: 2px solid white; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; transition: all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.9)'" onmouseout="this.style.background='white'"`;
+            const dividerStyle = `style="border-top: 1px solid rgba(255,255,255,0.3); margin: 12px 0;"`;
+            const rowStyle = `style="display:flex; justify-content:space-between; padding: 3px 0; font-size:0.9em;"`;
+            const labelStyle = `style="opacity:0.85;"`;
+            const valueStyle = `style="font-weight:600;"`;
+
             const summaryCards = document.getElementById('summaryCards');
             summaryCards.innerHTML = `
                 <div class="result-card">
-                    <h3>ぽぽ 合計</h3>
-                    <div class="result-amount">¥${group1Total.toLocaleString()}</div>
-                    <div class="result-detail">${results.filter(r => r.group === 1).length}商品</div>
-                    <div class="result-detail" style="margin-top: 10px; font-size: 0.95em;">
-                        売上割合: ${(group1Ratio * 100).toFixed(1)}%<br>
-                        振込手数料: -¥${Math.round(group1Fee).toLocaleString()}<br>
-                        <strong style="font-size: 1.1em;">受取金額: ¥${Math.floor(group1Net).toLocaleString()}</strong>
-                    </div>
-                    <button onclick="downloadGroupCSV(1)" style="margin-top: 15px; padding: 10px 20px; background: white; color: #73C2FB; border: 2px solid white; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; transition: all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.9)'" onmouseout="this.style.background='white'">CSVを保存</button>
+                    <h3>ぽぽ</h3>
+                    <div class="result-amount">¥${Math.floor(group1Net).toLocaleString()}</div>
+                    <div ${dividerStyle}></div>
+                    <div ${rowStyle}><span ${labelStyle}>売上合計（手数料前）</span><span ${valueStyle}>¥${Math.floor(group1Subtotal).toLocaleString()}</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>BOOTH手数料</span><span ${valueStyle}>-¥${Math.floor(Math.abs(group1BoothFee)).toLocaleString()}</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>手数料差し引き後</span><span ${valueStyle}>¥${Math.floor(group1Total).toLocaleString()}</span></div>
+                    <div ${dividerStyle}></div>
+                    <div ${rowStyle}><span ${labelStyle}>販売件数</span><span ${valueStyle}>${group1Count}件</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>商品数</span><span ${valueStyle}>${group1Results.length}商品</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>売上割合</span><span ${valueStyle}>${(group1Ratio * 100).toFixed(1)}%</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>振込手数料</span><span ${valueStyle}>-¥${Math.round(group1Fee).toLocaleString()}</span></div>
+                    <div ${dividerStyle}></div>
+                    <div ${rowStyle}><span ${labelStyle}>受取金額</span><span style="font-weight:700; font-size:1.05em;">¥${Math.floor(group1Net).toLocaleString()}</span></div>
+                    <button onclick="downloadGroupCSV(1)" ${cardStyle}>CSVを保存</button>
                 </div>
                 <div class="result-card">
-                    <h3>ぽ 合計</h3>
-                    <div class="result-amount">¥${group2Total.toLocaleString()}</div>
-                    <div class="result-detail">${results.filter(r => r.group === 2).length}商品</div>
-                    <div class="result-detail" style="margin-top: 10px; font-size: 0.95em;">
-                        売上割合: ${(group2Ratio * 100).toFixed(1)}%<br>
-                        振込手数料: -¥${Math.round(group2Fee).toLocaleString()}<br>
-                        <strong style="font-size: 1.1em;">受取金額: ¥${Math.floor(group2Net).toLocaleString()}</strong>
-                    </div>
-                    <button onclick="downloadGroupCSV(2)" style="margin-top: 15px; padding: 10px 20px; background: white; color: #73C2FB; border: 2px solid white; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; transition: all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.9)'" onmouseout="this.style.background='white'">CSVを保存</button>
+                    <h3>ぽ</h3>
+                    <div class="result-amount">¥${Math.floor(group2Net).toLocaleString()}</div>
+                    <div ${dividerStyle}></div>
+                    <div ${rowStyle}><span ${labelStyle}>売上合計（手数料前）</span><span ${valueStyle}>¥${Math.floor(group2Subtotal).toLocaleString()}</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>BOOTH手数料</span><span ${valueStyle}>-¥${Math.floor(Math.abs(group2BoothFee)).toLocaleString()}</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>手数料差し引き後</span><span ${valueStyle}>¥${Math.floor(group2Total).toLocaleString()}</span></div>
+                    <div ${dividerStyle}></div>
+                    <div ${rowStyle}><span ${labelStyle}>販売件数</span><span ${valueStyle}>${group2Count}件</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>商品数</span><span ${valueStyle}>${group2Results.length}商品</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>売上割合</span><span ${valueStyle}>${(group2Ratio * 100).toFixed(1)}%</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>振込手数料</span><span ${valueStyle}>-¥${Math.round(group2Fee).toLocaleString()}</span></div>
+                    <div ${dividerStyle}></div>
+                    <div ${rowStyle}><span ${labelStyle}>受取金額</span><span style="font-weight:700; font-size:1.05em;">¥${Math.floor(group2Net).toLocaleString()}</span></div>
+                    <button onclick="downloadGroupCSV(2)" ${cardStyle}>CSVを保存</button>
                 </div>
                 <div class="result-card">
                     <h3>総合計</h3>
-                    <div class="result-amount">¥${grandTotal.toLocaleString()}</div>
-                    <div class="result-detail">${results.length}商品</div>
-                    <div class="result-detail" style="margin-top: 10px; font-size: 0.95em;">
-                        振込手数料合計: ¥${transferFee.toLocaleString()}<br>
-                        <strong style="font-size: 1.1em;">受取金額: ¥${Math.floor(grandTotal - transferFee).toLocaleString()}</strong>
-                    </div>
-                    <button onclick="downloadResultsSummary()" style="margin-top: 15px; padding: 10px 20px; background: white; color: #73C2FB; border: 2px solid white; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; transition: all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.9)'" onmouseout="this.style.background='white'">集計結果を保存</button>
+                    <div class="result-amount">¥${Math.floor(grandTotal - transferFee).toLocaleString()}</div>
+                    <div ${dividerStyle}></div>
+                    <div ${rowStyle}><span ${labelStyle}>売上合計（手数料前）</span><span ${valueStyle}>¥${Math.floor(grandSubtotal).toLocaleString()}</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>BOOTH手数料</span><span ${valueStyle}>-¥${Math.floor(Math.abs(grandBoothFee)).toLocaleString()}</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>手数料差し引き後</span><span ${valueStyle}>¥${Math.floor(grandTotal).toLocaleString()}</span></div>
+                    <div ${dividerStyle}></div>
+                    <div ${rowStyle}><span ${labelStyle}>総販売件数</span><span ${valueStyle}>${grandCount}件</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>総商品数</span><span ${valueStyle}>${results.length}商品</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>振込手数料</span><span ${valueStyle}>-¥${transferFee.toLocaleString()}</span></div>
+                    <div ${dividerStyle}></div>
+                    <div ${rowStyle}><span ${labelStyle}>受取金額</span><span style="font-weight:700; font-size:1.05em;">¥${Math.floor(grandTotal - transferFee).toLocaleString()}</span></div>
+                    <button onclick="downloadResultsSummary()" ${cardStyle}>集計結果を保存</button>
                 </div>
             `;
             
