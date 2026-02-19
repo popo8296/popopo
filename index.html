@@ -967,6 +967,23 @@
             <table id="detailsTable"></table>
         </div>
         
+        <!-- CSV閲覧セクション -->
+        <div class="csv-viewer-section" id="csvViewerSection" style="display:none; margin-top:50px; padding:30px; background:white; border-radius:12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h2 style="color:#333; margin:0;">CSV閲覧</h2>
+                <button class="expand-btn" onclick="toggleCsvViewer()" id="csvViewerToggleBtn">表示</button>
+            </div>
+            <div id="csvViewerContent" style="display:none;">
+                <div style="margin-bottom:15px; padding:15px; background:#f8f9fa; border-radius:8px;">
+                    <p style="margin:0; color:#666;">読み込まれたCSVデータ: <strong id="csvRowCount">0</strong>件</p>
+                </div>
+                <div style="overflow-x:auto; max-height:600px; overflow-y:auto; border:1px solid #ddd; border-radius:8px;">
+                    <table id="csvViewerTable" style="width:100%; border-collapse:collapse; background:white; font-size:0.85em;">
+                    </table>
+                </div>
+            </div>
+        </div>
+        
         <div class="chart-section" id="chartSection" style="display:none;">
             <h2>グラフ・分析</h2>
             <div class="chart-tabs">
@@ -1033,12 +1050,21 @@
 
         // ====== グループ設定の保存・読み込み ======
         function saveUnifiedData() {
-            // CSVデータに設定情報を追加列として保存
+            // CSVデータに設定情報を追加列として保存（全列を保持）
             let csv = '\uFEFF'; // BOM
             
-            // ヘッダー行：元のBOOTHのヘッダー + 設定列
-            const headers = ['注文日時', '商品ID', '商品名', '購入者', '小計', 'サービス利用料・倉庫発送手数料', '受取金額', '設定_グループ', '設定_分配割合', '設定_分配有効'];
-            csv += headers.join(',') + '\n';
+            // 元のCSVから全てのヘッダーを取得
+            if (csvData.length === 0) {
+                alert('保存するデータがありません');
+                return;
+            }
+            
+            const originalHeaders = Object.keys(csvData[0]);
+            const settingHeaders = ['設定_グループ', '設定_分配割合', '設定_分配有効'];
+            const allHeaders = [...originalHeaders, ...settingHeaders];
+            
+            // ヘッダー行
+            csv += allHeaders.map(h => `"${h}"`).join(',') + '\n';
             
             // データ行
             csvData.forEach(row => {
@@ -1049,21 +1075,22 @@
                 const isRatioEnabled = ratioEl && ratioEl.classList.contains('active');
                 const ratio = productRatios[productName] || 50;
                 
-                // 元のデータ
-                const orderDate = row['注文日時'] || '';
-                const productId = row['商品ID'] || '';
-                const productNameVal = `"${(row['商品名'] || '').replace(/"/g, '""')}"`;
-                const buyer = `"${(row['購入者'] || '').replace(/"/g, '""')}"`;
-                const subtotal = row['小計'] || '0';
-                const fee = row['サービス利用料・倉庫発送手数料'] || '0';
-                const amount = row['受取金額'] || '0';
+                // 元のデータ（全列）
+                const rowData = originalHeaders.map(header => {
+                    const value = row[header] || '';
+                    // CSVエスケープ処理
+                    if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+                        return `"${value.replace(/"/g, '""')}"`;
+                    }
+                    return value;
+                });
                 
                 // 設定データ
                 const settingGroup = group === 1 ? 'ぽぽ' : 'ぽ';
                 const settingRatio = ratio;
                 const settingEnabled = isRatioEnabled ? '有効' : '無効';
                 
-                csv += `${orderDate},${productId},${productNameVal},${buyer},${subtotal},${fee},${amount},${settingGroup},${settingRatio},${settingEnabled}\n`;
+                csv += rowData.join(',') + `,${settingGroup},${settingRatio},${settingEnabled}\n`;
             });
             
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -1092,15 +1119,20 @@
                     
                     if (hasSettings) {
                         // 統合CSVファイル
-                        // 現在のcsvDataとrawDataMapをクリア（統合CSVで置き換える）
-                        csvData = [];
-                        rawDataMap = {};
-                        fileNames = [];
-                        presetProducts = {};
-                        productGroups = {};
-                        productRatios = {};
+                        // 既存のcsvDataと統合（重複チェック）
+                        const seenOrderNumbers = new Set();
+                        
+                        // 既存データの注文番号を記録
+                        csvData.forEach(row => {
+                            const orderNumber = row['注文番号'];
+                            if (orderNumber) seenOrderNumbers.add(orderNumber);
+                        });
+                        
+                        // 新しく読み込むデータ
+                        const newRows = [];
                         
                         rows.forEach(row => {
+                            const orderNumber = row['注文番号'];
                             const productName = row['商品名'];
                             const settingGroup = row['設定_グループ'];
                             const settingRatio = parseInt(row['設定_分配割合']) || 50;
@@ -1118,23 +1150,40 @@
                                 productRatios[productName] = settingRatio;
                             }
                             
-                            // CSVデータに追加（設定列は除外）
-                            const cleanRow = {
-                                '注文日時': row['注文日時'],
-                                '商品ID': row['商品ID'],
-                                '商品名': row['商品名'],
-                                '購入者': row['購入者'],
-                                '小計': row['小計'],
-                                'サービス利用料・倉庫発送手数料': row['サービス利用料・倉庫発送手数料'],
-                                '受取金額': row['受取金額']
-                            };
-                            csvData.push(cleanRow);
+                            // 重複チェック
+                            if (orderNumber) {
+                                if (!seenOrderNumbers.has(orderNumber)) {
+                                    seenOrderNumbers.add(orderNumber);
+                                    // 設定列を除外してCSVデータに追加
+                                    const cleanRow = {...row};
+                                    delete cleanRow['設定_グループ'];
+                                    delete cleanRow['設定_分配割合'];
+                                    delete cleanRow['設定_分配有効'];
+                                    newRows.push(cleanRow);
+                                }
+                            } else {
+                                // 注文番号がない場合はそのまま追加
+                                const cleanRow = {...row};
+                                delete cleanRow['設定_グループ'];
+                                delete cleanRow['設定_分配割合'];
+                                delete cleanRow['設定_分配有効'];
+                                newRows.push(cleanRow);
+                            }
                         });
+                        
+                        // csvDataに追加（置き換えではなく追加）
+                        csvData = csvData.concat(newRows);
                         
                         // 統合CSVのファイル名を記録
                         originalFileName = file.name.replace('.csv', '').replace('booth_unified_', '');
                         
-                        document.getElementById('settingsLoadedMsg').textContent = `統合CSVを読み込みました（${Object.keys(presetProducts).length}商品の設定、全${csvData.length}件のデータ）`;
+                        const duplicateCount = rows.length - newRows.length;
+                        let message = `統合CSVを読み込みました（${Object.keys(presetProducts).length}商品の設定、${newRows.length}件の新規データ）`;
+                        if (duplicateCount > 0) {
+                            message += `\n重複 ${duplicateCount}件をスキップしました`;
+                        }
+                        
+                        document.getElementById('settingsLoadedMsg').textContent = message;
                         document.getElementById('settingsLoadedMsg').style.display = 'block';
                         setTimeout(() => document.getElementById('settingsLoadedMsg').style.display = 'none', 4000);
                         
@@ -1190,10 +1239,11 @@
                 let popoAmt = 0, poAmt = 0, popoSub = 0, poSub = 0;
                 if (isRatioEnabled) {
                     const ratio = productRatios[productName] || 50;
-                    popoAmt = amount * (ratio / 100);
-                    poAmt = amount * ((100 - ratio) / 100);
-                    popoSub = subtotal * (ratio / 100);
-                    poSub = subtotal * ((100 - ratio) / 100);
+                    // 端数をぽぽに寄せる：ぽを先に計算し、残りをぽぽに
+                    poAmt = Math.floor(amount * ((100 - ratio) / 100));
+                    popoAmt = amount - poAmt;
+                    poSub = Math.floor(subtotal * ((100 - ratio) / 100));
+                    popoSub = subtotal - poSub;
                 } else {
                     if (selectedGroup === 1) {
                         popoAmt = amount;
@@ -1229,8 +1279,9 @@
                 const boothFee = sub - total;
                 const ratio1 = total > 0 ? popo / total : 0.5;
                 const ratio2 = total > 0 ? po / total : 0.5;
-                const fee1 = transferFee * ratio1;
-                const fee2 = transferFee * ratio2;
+                // 振込手数料を分配（端数はぽぽに寄せる）
+                const fee2 = Math.floor(transferFee * ratio2);
+                const fee1 = transferFee - fee2;
                 const net1 = popo - fee1;
                 const net2 = po - fee2;
                 const netTotal = net1 + net2;
@@ -1280,14 +1331,23 @@
                     </div>
                     <div class="month-details" id="month_${latestMonth.month}">
                         <div class="month-details-grid">
-                            <div class="month-detail-item"><span class="month-detail-label">ぽぽ受取</span><span class="month-detail-value">¥${Math.floor(latestMonth.net1).toLocaleString()}</span></div>
-                            <div class="month-detail-item"><span class="month-detail-label">ぽ受取</span><span class="month-detail-value">¥${Math.floor(latestMonth.net2).toLocaleString()}</span></div>
-                            <div class="month-detail-item"><span class="month-detail-label">売上（手数料前）</span><span class="month-detail-value">¥${latestMonth.subtotal.toLocaleString()}</span></div>
+                            <div class="month-detail-item"><span class="month-detail-label">ぽぽ（手数料前）</span><span class="month-detail-value">¥${Math.floor(latestMonth.popoSub).toLocaleString()}</span></div>
+                            <div class="month-detail-item"><span class="month-detail-label">ぽぽ（手数料後）</span><span class="month-detail-value">¥${Math.floor(latestMonth.popo).toLocaleString()}</span></div>
+                            <div class="month-detail-item"><span class="month-detail-label">ぽぽ受取</span><span class="month-detail-value" style="font-weight:700; color:#73C2FB;">¥${Math.floor(latestMonth.net1).toLocaleString()}</span></div>
+                            <div class="month-detail-item"><span class="month-detail-label">ぽ（手数料前）</span><span class="month-detail-value">¥${Math.floor(latestMonth.poSub).toLocaleString()}</span></div>
+                            <div class="month-detail-item"><span class="month-detail-label">ぽ（手数料後）</span><span class="month-detail-value">¥${Math.floor(latestMonth.po).toLocaleString()}</span></div>
+                            <div class="month-detail-item"><span class="month-detail-label">ぽ受取</span><span class="month-detail-value" style="font-weight:700; color:#ADE0EE;">¥${Math.floor(latestMonth.net2).toLocaleString()}</span></div>
+                            <div class="month-detail-item"><span class="month-detail-label">売上合計（手数料前）</span><span class="month-detail-value">¥${latestMonth.subtotal.toLocaleString()}</span></div>
                             <div class="month-detail-item"><span class="month-detail-label">BOOTH手数料</span><span class="month-detail-value">-¥${Math.abs(latestMonth.boothFee).toLocaleString()}</span></div>
                             <div class="month-detail-item"><span class="month-detail-label">手数料差引後</span><span class="month-detail-value">¥${latestMonth.total.toLocaleString()}</span></div>
                             <div class="month-detail-item"><span class="month-detail-label">振込手数料</span><span class="month-detail-value">-¥${Math.floor(transferFee).toLocaleString()}</span></div>
                             <div class="month-detail-item"><span class="month-detail-label">売上割合</span><span class="month-detail-value">ぽぽ ${(latestMonth.ratio1 * 100).toFixed(1)}% / ぽ ${(latestMonth.ratio2 * 100).toFixed(1)}%</span></div>
                             <div class="month-detail-item"><span class="month-detail-label">販売件数</span><span class="month-detail-value">${latestMonth.count}件</span></div>
+                        </div>
+                        <div style="display:flex; gap:10px; margin-top:15px; padding-top:15px; border-top:1px solid #eee;">
+                            <button onclick="event.stopPropagation(); downloadMonthCSV('${latestMonth.month}', 1)" style="flex:1; padding:10px; background:#73C2FB; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">ぽぽのCSV保存</button>
+                            <button onclick="event.stopPropagation(); downloadMonthCSV('${latestMonth.month}', 2)" style="flex:1; padding:10px; background:#ADE0EE; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">ぽのCSV保存</button>
+                            <button onclick="event.stopPropagation(); downloadMonthCSV('${latestMonth.month}', 0)" style="flex:1; padding:10px; background:#5AB3F5; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">総合計CSV保存</button>
                         </div>
                     </div>
                 </div>
@@ -1304,14 +1364,23 @@
                         </div>
                         <div class="month-details" id="month_${m.month}">
                             <div class="month-details-grid">
-                                <div class="month-detail-item"><span class="month-detail-label">ぽぽ受取</span><span class="month-detail-value">¥${Math.floor(m.net1).toLocaleString()}</span></div>
-                                <div class="month-detail-item"><span class="month-detail-label">ぽ受取</span><span class="month-detail-value">¥${Math.floor(m.net2).toLocaleString()}</span></div>
-                                <div class="month-detail-item"><span class="month-detail-label">売上（手数料前）</span><span class="month-detail-value">¥${m.subtotal.toLocaleString()}</span></div>
+                                <div class="month-detail-item"><span class="month-detail-label">ぽぽ（手数料前）</span><span class="month-detail-value">¥${Math.floor(m.popoSub).toLocaleString()}</span></div>
+                                <div class="month-detail-item"><span class="month-detail-label">ぽぽ（手数料後）</span><span class="month-detail-value">¥${Math.floor(m.popo).toLocaleString()}</span></div>
+                                <div class="month-detail-item"><span class="month-detail-label">ぽぽ受取</span><span class="month-detail-value" style="font-weight:700; color:#73C2FB;">¥${Math.floor(m.net1).toLocaleString()}</span></div>
+                                <div class="month-detail-item"><span class="month-detail-label">ぽ（手数料前）</span><span class="month-detail-value">¥${Math.floor(m.poSub).toLocaleString()}</span></div>
+                                <div class="month-detail-item"><span class="month-detail-label">ぽ（手数料後）</span><span class="month-detail-value">¥${Math.floor(m.po).toLocaleString()}</span></div>
+                                <div class="month-detail-item"><span class="month-detail-label">ぽ受取</span><span class="month-detail-value" style="font-weight:700; color:#ADE0EE;">¥${Math.floor(m.net2).toLocaleString()}</span></div>
+                                <div class="month-detail-item"><span class="month-detail-label">売上合計（手数料前）</span><span class="month-detail-value">¥${m.subtotal.toLocaleString()}</span></div>
                                 <div class="month-detail-item"><span class="month-detail-label">BOOTH手数料</span><span class="month-detail-value">-¥${Math.abs(m.boothFee).toLocaleString()}</span></div>
                                 <div class="month-detail-item"><span class="month-detail-label">手数料差引後</span><span class="month-detail-value">¥${m.total.toLocaleString()}</span></div>
                                 <div class="month-detail-item"><span class="month-detail-label">振込手数料</span><span class="month-detail-value">-¥${Math.floor(transferFee).toLocaleString()}</span></div>
                                 <div class="month-detail-item"><span class="month-detail-label">売上割合</span><span class="month-detail-value">ぽぽ ${(m.ratio1 * 100).toFixed(1)}% / ぽ ${(m.ratio2 * 100).toFixed(1)}%</span></div>
                                 <div class="month-detail-item"><span class="month-detail-label">販売件数</span><span class="month-detail-value">${m.count}件</span></div>
+                            </div>
+                            <div style="display:flex; gap:10px; margin-top:15px; padding-top:15px; border-top:1px solid #eee;">
+                                <button onclick="event.stopPropagation(); downloadMonthCSV('${m.month}', 1)" style="flex:1; padding:10px; background:#73C2FB; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">ぽぽのCSV保存</button>
+                                <button onclick="event.stopPropagation(); downloadMonthCSV('${m.month}', 2)" style="flex:1; padding:10px; background:#ADE0EE; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">ぽのCSV保存</button>
+                                <button onclick="event.stopPropagation(); downloadMonthCSV('${m.month}', 0)" style="flex:1; padding:10px; background:#5AB3F5; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">総合計CSV保存</button>
                             </div>
                         </div>
                     </div>
@@ -1332,7 +1401,7 @@
             });
             const totalNet = totalPopo + totalPo;
             const totalBoothFee = totalSub - (monthsInfo.reduce((s, m) => s + m.total, 0));
-            const totalTransferFee = transferFee * monthsInfo.length;
+            const totalTransferFee = monthsInfo.reduce((s, m) => s + m.fee1 + m.fee2, 0); // 実際の手数料合計
             const totalGrandTotal = monthsInfo.reduce((s, m) => s + m.total, 0);
             const totalPopoRatio = totalGrandTotal > 0 ? (totalGrandTotal - totalPo) / totalGrandTotal : 0.5;
             const totalPoRatio = totalGrandTotal > 0 ? totalPo / totalGrandTotal : 0.5;
@@ -1444,10 +1513,25 @@
         }
 
         function rebuildCsvData() {
+            const seenOrderNumbers = new Set();
             csvData = [];
             fileNames = [];
+            
             Object.values(rawDataMap).forEach(f => {
-                csvData = csvData.concat(f.rows);
+                f.rows.forEach(row => {
+                    const orderNumber = row['注文番号'];
+                    // 注文番号がある場合は重複チェック
+                    if (orderNumber) {
+                        if (!seenOrderNumbers.has(orderNumber)) {
+                            seenOrderNumbers.add(orderNumber);
+                            csvData.push(row);
+                        }
+                        // 重複の場合はスキップ
+                    } else {
+                        // 注文番号がない場合はそのまま追加
+                        csvData.push(row);
+                    }
+                });
                 fileNames.push(f.name);
             });
             originalFileName = fileNames.join('_');
@@ -1637,10 +1721,11 @@
                     
                     if (isRatioEnabled) {
                         const ratio = productRatios[productName] || 50;
-                        const popoAmount = amount * (ratio / 100);
-                        const poAmount = amount * ((100 - ratio) / 100);
-                        const popoSubtotal = subtotal * (ratio / 100);
-                        const poSubtotal = subtotal * ((100 - ratio) / 100);
+                        // 端数をぽぽに寄せる：ぽを先に計算し、残りをぽぽに
+                        const poAmount = Math.floor(amount * ((100 - ratio) / 100));
+                        const popoAmount = amount - poAmount;
+                        const poSubtotal = Math.floor(subtotal * ((100 - ratio) / 100));
+                        const popoSubtotal = subtotal - poSubtotal;
                         
                         if (popoAmount > 0 || popoSubtotal > 0) {
                             const popoKey = `${productName}|||1`;
@@ -1744,10 +1829,11 @@
                 
                 if (isRatioEnabled) {
                     const ratio = productRatios[productName] || 50;
-                    const popoAmount = amount * (ratio / 100);
-                    const poAmount = amount * ((100 - ratio) / 100);
-                    const popoSubtotal = subtotal * (ratio / 100);
-                    const poSubtotal = subtotal * ((100 - ratio) / 100);
+                    // 端数をぽぽに寄せる：ぽを先に計算し、残りをぽぽに
+                    const poAmount = Math.floor(amount * ((100 - ratio) / 100));
+                    const popoAmount = amount - poAmount;
+                    const poSubtotal = Math.floor(subtotal * ((100 - ratio) / 100));
+                    const popoSubtotal = subtotal - poSubtotal;
                     
                     if (popoAmount > 0 || popoSubtotal > 0) {
                         const popoKey = `${productName}|||1`;
@@ -1814,8 +1900,9 @@
             const group1Ratio = grandTotal > 0 ? group1Total / grandTotal : 0;
             const group2Ratio = grandTotal > 0 ? group2Total / grandTotal : 0;
             
-            const group1Fee = transferFee * group1Ratio;
-            const group2Fee = transferFee * group2Ratio;
+            // 振込手数料を分配（端数はぽぽに寄せる）
+            const group2Fee = Math.floor(transferFee * group2Ratio);
+            const group1Fee = transferFee - group2Fee; // 残りをぽぽに
             
             const group1Net = group1Total - group1Fee;
             const group2Net = group2Total - group2Fee;
@@ -1839,7 +1926,7 @@
                     <div ${rowStyle}><span ${labelStyle}>販売件数</span><span ${valueStyle}>${group1Count}件</span></div>
                     <div ${rowStyle}><span ${labelStyle}>商品数</span><span ${valueStyle}>${group1Results.length}商品</span></div>
                     <div ${rowStyle}><span ${labelStyle}>売上割合</span><span ${valueStyle}>${(group1Ratio * 100).toFixed(1)}%</span></div>
-                    <div ${rowStyle}><span ${labelStyle}>振込手数料</span><span ${valueStyle}>-¥${Math.round(group1Fee).toLocaleString()}</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>振込手数料</span><span ${valueStyle}>-¥${Math.floor(group1Fee).toLocaleString()}</span></div>
                     <div ${dividerStyle}></div>
                     <div ${rowStyle}><span ${labelStyle}>受取金額</span><span style="font-weight:700; font-size:1.05em;">¥${Math.floor(group1Net).toLocaleString()}</span></div>
                     <button onclick="downloadGroupCSV(1)" ${cardStyle}>CSVを保存</button>
@@ -1855,7 +1942,7 @@
                     <div ${rowStyle}><span ${labelStyle}>販売件数</span><span ${valueStyle}>${group2Count}件</span></div>
                     <div ${rowStyle}><span ${labelStyle}>商品数</span><span ${valueStyle}>${group2Results.length}商品</span></div>
                     <div ${rowStyle}><span ${labelStyle}>売上割合</span><span ${valueStyle}>${(group2Ratio * 100).toFixed(1)}%</span></div>
-                    <div ${rowStyle}><span ${labelStyle}>振込手数料</span><span ${valueStyle}>-¥${Math.round(group2Fee).toLocaleString()}</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>振込手数料</span><span ${valueStyle}>-¥${Math.floor(group2Fee).toLocaleString()}</span></div>
                     <div ${dividerStyle}></div>
                     <div ${rowStyle}><span ${labelStyle}>受取金額</span><span style="font-weight:700; font-size:1.05em;">¥${Math.floor(group2Net).toLocaleString()}</span></div>
                     <button onclick="downloadGroupCSV(2)" ${cardStyle}>CSVを保存</button>
@@ -1920,6 +2007,9 @@
             renderDailyChart();
             renderMonthlyChart();
             renderForecastChart();
+            
+            // CSV閲覧セクションを表示
+            document.getElementById('csvViewerSection').style.display = 'block';
         }
 
         function prepareDailySales() {
@@ -1943,6 +2033,7 @@
             latestMonthRows.forEach(row => {
                 const productName = row['商品名'];
                 const amount = parseFloat(row['受取金額']) || 0;
+                const subtotal = parseFloat(row['小計']) || 0;
                 const rawDate = (row['注文日時'] || '').split(' ')[0];
                 if (!rawDate) return;
                 const dateStr = rawDate.replace(/\//g, '-');
@@ -1952,19 +2043,29 @@
                 const ratioEl = document.getElementById(`ratio_${safeId}`);
                 const isRatioEnabled = ratioEl && ratioEl.classList.contains('active');
                 
-                let popoAmt = 0, poAmt = 0;
+                let popoAmt = 0, poAmt = 0, popoSub = 0, poSub = 0;
                 if (isRatioEnabled) {
                     const ratio = productRatios[productName] || 50;
-                    popoAmt = amount * (ratio / 100);
-                    poAmt = amount * ((100 - ratio) / 100);
+                    // 端数をぽぽに寄せる：ぽを先に計算し、残りをぽぽに
+                    poAmt = Math.floor(amount * ((100 - ratio) / 100));
+                    popoAmt = amount - poAmt;
+                    poSub = Math.floor(subtotal * ((100 - ratio) / 100));
+                    popoSub = subtotal - poSub;
                 } else {
-                    if (selectedGroup === 1) popoAmt = amount;
-                    else poAmt = amount;
+                    if (selectedGroup === 1) {
+                        popoAmt = amount;
+                        popoSub = subtotal;
+                    } else {
+                        poAmt = amount;
+                        poSub = subtotal;
+                    }
                 }
                 
-                if (!dailyData[dateStr]) dailyData[dateStr] = { popo: 0, po: 0 };
+                if (!dailyData[dateStr]) dailyData[dateStr] = { popo: 0, po: 0, popoSub: 0, poSub: 0 };
                 dailyData[dateStr].popo += popoAmt;
                 dailyData[dateStr].po += poAmt;
+                dailyData[dateStr].popoSub += popoSub;
+                dailyData[dateStr].poSub += poSub;
             });
             
             // 日付順にソート（新しい順）
@@ -1980,10 +2081,31 @@
                 const popo = Math.floor(d.popo);
                 const po = Math.floor(d.po);
                 const total = popo + po;
+                const popoSub = Math.floor(d.popoSub);
+                const poSub = Math.floor(d.poSub);
+                const totalSub = popoSub + poSub;
                 
-                popoHTML += `<div class="daily-sales-item"><span class="daily-sales-date">${date}</span><span class="daily-sales-amount">¥${popo.toLocaleString()}</span></div>`;
-                poHTML += `<div class="daily-sales-item"><span class="daily-sales-date">${date}</span><span class="daily-sales-amount">¥${po.toLocaleString()}</span></div>`;
-                totalHTML += `<div class="daily-sales-item"><span class="daily-sales-date">${date}</span><span class="daily-sales-amount">¥${total.toLocaleString()}</span></div>`;
+                popoHTML += `<div class="daily-sales-item">
+                    <span class="daily-sales-date">${date}</span>
+                    <span class="daily-sales-amount">
+                        <div>手数料前: ¥${popoSub.toLocaleString()}</div>
+                        <div style="font-weight:700; color:#73C2FB;">受取: ¥${popo.toLocaleString()}</div>
+                    </span>
+                </div>`;
+                poHTML += `<div class="daily-sales-item">
+                    <span class="daily-sales-date">${date}</span>
+                    <span class="daily-sales-amount">
+                        <div>手数料前: ¥${poSub.toLocaleString()}</div>
+                        <div style="font-weight:700; color:#ADE0EE;">受取: ¥${po.toLocaleString()}</div>
+                    </span>
+                </div>`;
+                totalHTML += `<div class="daily-sales-item">
+                    <span class="daily-sales-date">${date}</span>
+                    <span class="daily-sales-amount">
+                        <div>手数料前: ¥${totalSub.toLocaleString()}</div>
+                        <div style="font-weight:700; color:#5AB3F5;">受取: ¥${total.toLocaleString()}</div>
+                    </span>
+                </div>`;
             });
             
             const contentHTML = `
@@ -2018,6 +2140,55 @@
                 content.style.display = 'none';
                 btn.textContent = '表示';
             }
+        }
+
+        function toggleCsvViewer() {
+            const content = document.getElementById('csvViewerContent');
+            const btn = document.getElementById('csvViewerToggleBtn');
+            
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                btn.textContent = '隠す';
+                renderCsvViewer();
+            } else {
+                content.style.display = 'none';
+                btn.textContent = '表示';
+            }
+        }
+
+        function renderCsvViewer() {
+            if (csvData.length === 0) {
+                document.getElementById('csvViewerTable').innerHTML = '<tr><td style="padding:20px; text-align:center; color:#999;">読み込まれたCSVデータがありません</td></tr>';
+                document.getElementById('csvRowCount').textContent = '0';
+                return;
+            }
+
+            // 行数を表示
+            document.getElementById('csvRowCount').textContent = csvData.length.toLocaleString();
+
+            // ヘッダー行を取得
+            const headers = Object.keys(csvData[0]);
+            
+            // テーブルHTML生成
+            let tableHTML = '<thead style="position:sticky; top:0; background:#73C2FB; color:white; z-index:10;"><tr>';
+            headers.forEach(header => {
+                tableHTML += `<th style="padding:12px 8px; text-align:left; border-bottom:2px solid white; white-space:nowrap; font-weight:600;">${header}</th>`;
+            });
+            tableHTML += '</tr></thead><tbody>';
+
+            // データ行
+            csvData.forEach((row, index) => {
+                const bgColor = index % 2 === 0 ? '#ffffff' : '#f8f9fa';
+                tableHTML += `<tr style="background:${bgColor};">`;
+                headers.forEach(header => {
+                    const value = row[header] || '';
+                    tableHTML += `<td style="padding:8px; border-bottom:1px solid #eee; white-space:nowrap;">${value}</td>`;
+                });
+                tableHTML += '</tr>';
+            });
+
+            tableHTML += '</tbody>';
+            document.getElementById('csvViewerTable').innerHTML = tableHTML;
         }
 
         function downloadResultsSummary() {
@@ -2186,6 +2357,87 @@
             const url = URL.createObjectURL(blob);
             link.setAttribute('href', url);
             link.setAttribute('download', `${originalFileName}_${groupName}合計.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        function downloadMonthCSV(month, group) {
+            if (csvData.length === 0) {
+                alert('まずCSVファイルを読み込んでください');
+                return;
+            }
+            
+            // その月のデータのみフィルタ
+            const monthData = csvData.filter(row => {
+                const rawDate = (row['注文日時'] || '').split(' ')[0];
+                if (!rawDate) return false;
+                const dateStr = rawDate.replace(/\//g, '-');
+                const monthStr = dateStr.substring(0, 7);
+                return monthStr === month;
+            });
+            
+            if (monthData.length === 0) {
+                alert(`${month}のデータがありません`);
+                return;
+            }
+            
+            // group: 0=総合計, 1=ぽぽ, 2=ぽ
+            let filteredData = monthData;
+            let groupName = '総合計';
+            
+            if (group !== 0) {
+                groupName = group === 1 ? 'ぽぽ' : 'ぽ';
+                filteredData = monthData.filter(row => {
+                    const productName = row['商品名'];
+                    const amount = parseFloat(row['受取金額']) || 0;
+                    
+                    if (amount > 0) {
+                        const safeId = productName.replace(/[^a-zA-Z0-9]/g, '_');
+                        const ratioControls = document.getElementById(`ratio_${safeId}`);
+                        const isRatioEnabled = ratioControls && ratioControls.classList.contains('active');
+                        
+                        if (isRatioEnabled) {
+                            const ratio = productRatios[productName] || 50;
+                            const popoRatio = ratio;
+                            const poRatio = 100 - ratio;
+                            
+                            if (group === 1) {
+                                return popoRatio > 0;
+                            } else {
+                                return poRatio > 0;
+                            }
+                        } else {
+                            return productGroups[productName] === group;
+                        }
+                    }
+                    return false;
+                });
+            }
+            
+            // CSVヘッダー
+            const headers = Object.keys(csvData[0]);
+            let csv = '\uFEFF'; // BOM
+            csv += headers.map(h => `"${h}"`).join(',') + '\n';
+            
+            // データ行
+            filteredData.forEach(row => {
+                const rowData = headers.map(header => {
+                    const value = row[header] || '';
+                    if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+                        return `"${value.replace(/"/g, '""')}"`;
+                    }
+                    return value;
+                });
+                csv += rowData.join(',') + '\n';
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `${month}_${groupName}.csv`);
             link.style.visibility = 'hidden';
             document.body.appendChild(link);
             link.click();
@@ -2422,8 +2674,9 @@
                 let popoAmt = 0, poAmt = 0;
                 if (isRatioEnabled) {
                     const ratio = productRatios[productName] || 50;
-                    popoAmt = amount * (ratio / 100);
-                    poAmt   = amount * ((100 - ratio) / 100);
+                    // 端数をぽぽに寄せる：ぽを先に計算し、残りをぽぽに
+                    poAmt = Math.floor(amount * ((100 - ratio) / 100));
+                    popoAmt = amount - poAmt;
                 } else {
                     if (selectedGroup === 1) popoAmt = amount;
                     else poAmt = amount;
@@ -2523,6 +2776,43 @@
             const actualData   = [...actualVals, ...Array(months).fill(null)];
             const forecastData = [...Array(n - 1).fill(null), actualVals[n - 1], ...forecastVals];
 
+            const targetLabel = target === 'popo' ? 'ぽぽ' : target === 'po' ? 'ぽ' : '合計';
+            drawChart('forecastChart', 'line', allLabels, [
+                { label: `${targetLabel}（実績）`, data: actualData,   borderColor: '#73C2FB', backgroundColor: 'rgba(115,194,251,0.15)', tension: 0.3, fill: true,  pointRadius: 4 },
+                { label: `${targetLabel}（予測）`, data: forecastData, borderColor: '#F5A623', backgroundColor: 'rgba(245,166,35,0.1)',    tension: 0.3, fill: false, borderDash: [6,4], pointRadius: 4 },
+            ]);
+
+            const trend = isNaN(slope) || slope === 0 ? '横ばい傾向'
+                : slope >= 0 ? `月約 ¥${Math.round(slope).toLocaleString()} の増加傾向`
+                             : `月約 ¥${Math.abs(Math.round(slope)).toLocaleString()} の減少傾向`;
+            const nextVal = forecastVals[0] ?? 0;
+            document.getElementById('forecastNote').innerHTML =
+                `<strong>予測について：</strong>過去 ${n} ヶ月の実績をもとに線形回帰で算出。${trend}が見られます。来月の予測は <strong>¥${nextVal.toLocaleString()}</strong> です。データ数が少ない場合や季節変動がある場合は参考値としてご利用ください。`;
+        }
+
+        function drawChart(id, type, labels, datasets) {
+            if (chartInstances[id]) chartInstances[id].destroy();
+            const ctx = document.getElementById(id).getContext('2d');
+            chartInstances[id] = new Chart(ctx, {
+                type,
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: { callbacks: { label: c => ` ¥${(c.parsed.y ?? 0).toLocaleString()}` } }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { callback: v => '¥' + v.toLocaleString() } }
+                    }
+                }
+            });
+        }
+        // ====== グラフ関連ここまで ======
+    </script>
+</body>
+</html>
             const targetLabel = target === 'popo' ? 'ぽぽ' : target === 'po' ? 'ぽ' : '合計';
             drawChart('forecastChart', 'line', allLabels, [
                 { label: `${targetLabel}（実績）`, data: actualData,   borderColor: '#73C2FB', backgroundColor: 'rgba(115,194,251,0.15)', tension: 0.3, fill: true,  pointRadius: 4 },
