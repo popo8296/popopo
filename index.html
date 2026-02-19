@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>売上集計ツール</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -96,6 +97,32 @@
         
         .file-row .remove-btn:hover {
             color: #e74c3c;
+        }
+        
+        .product-group-item.preset {
+            opacity: 0.55;
+            background: #f0f0f0;
+        }
+        
+        .product-group-item.preset .group-btn {
+            pointer-events: none;
+            cursor: default;
+        }
+        
+        .product-group-item.preset .ratio-toggle {
+            pointer-events: none;
+            cursor: default;
+        }
+        
+        .preset-badge {
+            font-size: 0.75em;
+            background: #aaa;
+            color: white;
+            border-radius: 4px;
+            padding: 2px 7px;
+            margin-left: 8px;
+            font-weight: 600;
+            vertical-align: middle;
         }
         
         .file-input-wrapper {
@@ -513,6 +540,261 @@
             font-size: 1.5em;
         }
         
+        .chart-section {
+            margin-top: 40px;
+        }
+        
+        .chart-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+        
+        .chart-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .chart-tab {
+            padding: 8px 20px;
+            border: 2px solid #73C2FB;
+            background: white;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #73C2FB;
+            transition: all 0.3s;
+            font-size: 0.9em;
+        }
+        
+        .chart-tab.active {
+            background: #73C2FB;
+            color: white;
+        }
+        
+        .chart-tab:hover:not(.active) {
+            background: #ADE0EE;
+        }
+        
+        .chart-panel {
+            display: none;
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 25px;
+        }
+        
+        .chart-panel.active {
+            display: block;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 350px;
+            margin-bottom: 20px;
+        }
+        
+        .chart-group-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+        
+        .chart-group-toggle label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+        
+        .forecast-note {
+            background: white;
+            border-left: 4px solid #73C2FB;
+            padding: 12px 15px;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.85em;
+            color: #555;
+            margin-top: 15px;
+        }
+        
+        .monthly-comparison {
+            margin-top: 30px;
+        }
+        
+        .month-summary-item {
+            background: white;
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: all 0.3s;
+            border-left: 4px solid #73C2FB;
+        }
+        
+        .month-summary-item:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transform: translateY(-2px);
+        }
+        
+        .month-summary-item.current-month {
+            border-left-color: #F5A623;
+            border-left-width: 5px;
+        }
+        
+        .month-summary-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .month-summary-title {
+            font-size: 1.1em;
+            font-weight: 700;
+            color: #333;
+        }
+        
+        .month-summary-amount {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #73C2FB;
+        }
+        
+        .month-badge {
+            background: #F5A623;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        
+        .month-comparison-badge {
+            font-size: 0.9em;
+            color: #666;
+            margin-left: 15px;
+        }
+        
+        .month-comparison-badge.positive {
+            color: #28a745;
+        }
+        
+        .month-comparison-badge.negative {
+            color: #dc3545;
+        }
+        
+        .month-details {
+            display: none;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 2px solid #f0f0f0;
+        }
+        
+        .month-details.expanded {
+            display: block;
+        }
+        
+        .month-details-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+        }
+        
+        .month-detail-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        
+        .month-detail-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .month-detail-value {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .expand-btn {
+            background: #ADE0EE;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #333;
+            transition: all 0.3s;
+        }
+        
+        .expand-btn:hover {
+            background: #73C2FB;
+            color: white;
+        }
+        
+        .daily-sales-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+            margin-top: 20px;
+        }
+        
+        .daily-sales-column {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        
+        .daily-sales-column h4 {
+            margin: 0 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #73C2FB;
+            color: #333;
+            font-size: 1.1em;
+        }
+        
+        .daily-sales-column.popo h4 {
+            border-bottom-color: #73C2FB;
+        }
+        
+        .daily-sales-column.po h4 {
+            border-bottom-color: #ADE0EE;
+        }
+        
+        .daily-sales-column.total h4 {
+            border-bottom-color: #5AB3F5;
+        }
+        
+        .daily-sales-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 0.9em;
+        }
+        
+        .daily-sales-item:last-child {
+            border-bottom: none;
+        }
+        
+        .daily-sales-date {
+            color: #666;
+        }
+        
+        .daily-sales-amount {
+            font-weight: 600;
+            color: #333;
+        }
+        
         .results-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -622,7 +904,12 @@
         
         <div class="upload-section">
             <div id="fileInputList" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;"></div>
-            <button class="btn-primary" onclick="addFileInput()" style="padding: 10px 25px; font-size: 0.95em;">CSVファイルを追加</button>
+            <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+                <button class="btn-primary" onclick="addFileInput()" style="padding: 10px 25px; font-size: 0.95em;">CSVファイルを追加</button>
+                <button class="btn-secondary" onclick="document.getElementById('unifiedFileInput').click()" style="padding: 10px 25px; font-size: 0.95em;">統合CSVを読み込む</button>
+                <input type="file" id="unifiedFileInput" accept=".csv" style="display:none;" onchange="loadUnifiedData(this)">
+            </div>
+            <div id="settingsLoadedMsg" style="display:none; margin-top:10px; color:#73C2FB; font-weight:600; font-size:0.9em;">データを読み込みました</div>
         </div>
         
         <div class="group-assignment" id="groupAssignment">
@@ -641,6 +928,7 @@
             </div>
             <div class="button-row">
                 <button class="btn-primary" onclick="calculateResults()">集計実行</button>
+                <button class="btn-secondary" onclick="saveUnifiedData()">統合CSVを保存</button>
                 <button class="btn-copy" onclick="copyResultsAsText()">テキストコピー</button>
             </div>
         </div>
@@ -652,8 +940,82 @@
         
         <div class="results" id="results">
             <h2>集計結果</h2>
+            
             <div class="results-grid" id="summaryCards"></div>
+            
+            <!-- 日別売上 -->
+            <div id="dailySalesSection" style="display:none; margin-top:30px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <h3 style="color:#333; margin:0;">日別売上</h3>
+                    <button class="expand-btn" onclick="toggleDailySales()" id="dailySalesToggleBtn">表示</button>
+                </div>
+                <div id="dailySalesContent" style="display:none;"></div>
+            </div>
+            
+            <!-- 月別比較（コンパクト版） -->
+            <div class="monthly-comparison" id="monthlyComparison" style="display:none; margin-top:30px;">
+                <h3 style="color:#333; margin-bottom:15px;">月別データ</h3>
+                <div id="monthlyComparisonContent"></div>
+            </div>
+            
+            <!-- 通算合算 -->
+            <div id="totalSummarySection" style="display:none; margin-top:30px;">
+                <h3 style="color:#333; margin-bottom:15px;">通算合算</h3>
+                <div class="results-grid" id="totalSummaryCards"></div>
+            </div>
+            
             <table id="detailsTable"></table>
+        </div>
+        
+        <div class="chart-section" id="chartSection" style="display:none;">
+            <h2>グラフ・分析</h2>
+            <div class="chart-tabs">
+                <button class="chart-tab active" onclick="switchTab('daily')">日別売上</button>
+                <button class="chart-tab" onclick="switchTab('monthly')">月別売上</button>
+                <button class="chart-tab" onclick="switchTab('forecast')">売上予測</button>
+            </div>
+            
+            <!-- 日別 -->
+            <div class="chart-panel active" id="panel-daily">
+                <div class="chart-group-toggle">
+                    <span style="font-weight:600; margin-right:5px;">表示:</span>
+                    <label><input type="checkbox" id="daily-popo" checked onchange="renderDailyChart()"> ぽぽ</label>
+                    <label><input type="checkbox" id="daily-po" checked onchange="renderDailyChart()"> ぽ</label>
+                    <label><input type="checkbox" id="daily-total" checked onchange="renderDailyChart()"> 合計</label>
+                </div>
+                <div class="chart-container"><canvas id="dailyChart"></canvas></div>
+            </div>
+            
+            <!-- 月別 -->
+            <div class="chart-panel" id="panel-monthly">
+                <div class="chart-group-toggle">
+                    <span style="font-weight:600; margin-right:5px;">表示:</span>
+                    <label><input type="checkbox" id="monthly-popo" checked onchange="renderMonthlyChart()"> ぽぽ</label>
+                    <label><input type="checkbox" id="monthly-po" checked onchange="renderMonthlyChart()"> ぽ</label>
+                    <label><input type="checkbox" id="monthly-total" checked onchange="renderMonthlyChart()"> 合計</label>
+                </div>
+                <div class="chart-container"><canvas id="monthlyChart"></canvas></div>
+            </div>
+            
+            <!-- 予測 -->
+            <div class="chart-panel" id="panel-forecast">
+                <div class="chart-group-toggle">
+                    <span style="font-weight:600; margin-right:5px;">予測対象:</span>
+                    <label><input type="radio" name="forecast-group" value="total" checked onchange="renderForecastChart()"> 合計</label>
+                    <label><input type="radio" name="forecast-group" value="popo" onchange="renderForecastChart()"> ぽぽ</label>
+                    <label><input type="radio" name="forecast-group" value="po" onchange="renderForecastChart()"> ぽ</label>
+                    &nbsp;&nbsp;
+                    <span style="font-weight:600; margin-right:5px;">予測期間:</span>
+                    <select id="forecastMonths" onchange="renderForecastChart()" style="padding:5px 10px; border:2px solid #73C2FB; border-radius:6px; font-size:0.9em;">
+                        <option value="1">1ヶ月</option>
+                        <option value="3" selected>3ヶ月</option>
+                        <option value="6">6ヶ月</option>
+                        <option value="12">12ヶ月</option>
+                    </select>
+                </div>
+                <div class="chart-container"><canvas id="forecastChart"></canvas></div>
+                <div class="forecast-note" id="forecastNote"></div>
+            </div>
         </div>
     </div>
 
@@ -662,12 +1024,376 @@
         let productGroups = {};
         let productRatios = {};
         let results = [];
-        let rawDataMap = {}; // fileId -> rows
+        let rawDataMap = {};
         let fileCounter = 0;
         let fileNames = [];
+        let originalFileName = '';
+        let presetProducts = {};
+        let productIdToName = {};
 
-        // 初期化：最初の1行を自動追加
-        window.addEventListener('DOMContentLoaded', () => addFileInput());
+        // ====== グループ設定の保存・読み込み ======
+        function saveUnifiedData() {
+            // CSVデータに設定情報を追加列として保存
+            let csv = '\uFEFF'; // BOM
+            
+            // ヘッダー行：元のBOOTHのヘッダー + 設定列
+            const headers = ['注文日時', '商品ID', '商品名', '購入者', '小計', 'サービス利用料・倉庫発送手数料', '受取金額', '設定_グループ', '設定_分配割合', '設定_分配有効'];
+            csv += headers.join(',') + '\n';
+            
+            // データ行
+            csvData.forEach(row => {
+                const productName = row['商品名'];
+                const group = productGroups[productName] || 1;
+                const safeId = productName.replace(/[^a-zA-Z0-9]/g, '_');
+                const ratioEl = document.getElementById(`ratio_${safeId}`);
+                const isRatioEnabled = ratioEl && ratioEl.classList.contains('active');
+                const ratio = productRatios[productName] || 50;
+                
+                // 元のデータ
+                const orderDate = row['注文日時'] || '';
+                const productId = row['商品ID'] || '';
+                const productNameVal = `"${(row['商品名'] || '').replace(/"/g, '""')}"`;
+                const buyer = `"${(row['購入者'] || '').replace(/"/g, '""')}"`;
+                const subtotal = row['小計'] || '0';
+                const fee = row['サービス利用料・倉庫発送手数料'] || '0';
+                const amount = row['受取金額'] || '0';
+                
+                // 設定データ
+                const settingGroup = group === 1 ? 'ぽぽ' : 'ぽ';
+                const settingRatio = ratio;
+                const settingEnabled = isRatioEnabled ? '有効' : '無効';
+                
+                csv += `${orderDate},${productId},${productNameVal},${buyer},${subtotal},${fee},${amount},${settingGroup},${settingRatio},${settingEnabled}\n`;
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            const dateStr = new Date().toISOString().split('T')[0];
+            link.setAttribute('download', `booth_unified_${dateStr}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function loadUnifiedData(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = e => {
+                try {
+                    const text = e.target.result;
+                    const rows = parseCSVToRows(text);
+                    
+                    // 設定列があるかチェック
+                    const hasSettings = rows.length > 0 && rows[0]['設定_グループ'];
+                    
+                    if (hasSettings) {
+                        // 統合CSVファイル
+                        csvData = [];
+                        presetProducts = {};
+                        productGroups = {};
+                        productRatios = {};
+                        
+                        rows.forEach(row => {
+                            const productName = row['商品名'];
+                            const settingGroup = row['設定_グループ'];
+                            const settingRatio = parseInt(row['設定_分配割合']) || 50;
+                            const settingEnabled = row['設定_分配有効'] === '有効';
+                            
+                            // 設定を復元（最初の行のみ）
+                            if (productName && !presetProducts[productName]) {
+                                const group = settingGroup === 'ぽぽ' ? 1 : 2;
+                                presetProducts[productName] = {
+                                    group,
+                                    ratio: settingRatio,
+                                    ratioEnabled: settingEnabled
+                                };
+                                productGroups[productName] = group;
+                                productRatios[productName] = settingRatio;
+                            }
+                            
+                            // CSVデータに追加（設定列は除外）
+                            const cleanRow = {
+                                '注文日時': row['注文日時'],
+                                '商品ID': row['商品ID'],
+                                '商品名': row['商品名'],
+                                '購入者': row['購入者'],
+                                '小計': row['小計'],
+                                'サービス利用料・倉庫発送手数料': row['サービス利用料・倉庫発送手数料'],
+                                '受取金額': row['受取金額']
+                            };
+                            csvData.push(cleanRow);
+                        });
+                        
+                        document.getElementById('settingsLoadedMsg').textContent = `統合ファイルを読み込みました（${Object.keys(presetProducts).length}商品の設定を復元）`;
+                        document.getElementById('settingsLoadedMsg').style.display = 'block';
+                        setTimeout(() => document.getElementById('settingsLoadedMsg').style.display = 'none', 3000);
+                        
+                        // 商品リスト表示
+                        const uniqueProducts = new Set(csvData.map(r => r['商品名']));
+                        displayProductList(Array.from(uniqueProducts));
+                        
+                    } else {
+                        // 通常のBOOTH CSVファイル
+                        alert('これは通常のBOOTH CSVファイルです。「CSVファイルを追加」から読み込んでください。');
+                    }
+                } catch(err) {
+                    alert('統合ファイルの読み込みに失敗しました: ' + err.message);
+                    console.error(err);
+                }
+            };
+            reader.readAsText(file, 'UTF-8');
+            input.value = '';
+        }
+
+        function toggleOldMonths() {
+            const old = document.getElementById('oldMonths');
+            const btn = event.target;
+            old.classList.toggle('expanded');
+            btn.textContent = old.classList.contains('expanded') ? '過去の月を隠す' : '過去の月を表示';
+        }
+
+        function displayMonthlyComparison() {
+            if (results.length === 0) {
+                document.getElementById('monthlyComparison').style.display = 'none';
+                return;
+            }
+
+            const transferFee = parseFloat(document.getElementById('transferFee').value) || 0;
+
+            // CSVから全ての月を集計
+            const allMonthData = {};
+            csvData.forEach(row => {
+                const productName = row['商品名'];
+                const amount = parseFloat(row['受取金額']) || 0;
+                const subtotal = parseFloat(row['小計']) || 0;
+                
+                const rawDate = (row['注文日時'] || '').split(' ')[0];
+                if (!rawDate) return;
+                const dateStr = rawDate.replace(/\//g, '-');
+                const monthStr = dateStr.substring(0, 7);
+
+                const selectedGroup = productGroups[productName] || 1;
+                const safeId = productName.replace(/[^a-zA-Z0-9]/g, '_');
+                const ratioEl = document.getElementById(`ratio_${safeId}`);
+                const isRatioEnabled = ratioEl && ratioEl.classList.contains('active');
+
+                let popoAmt = 0, poAmt = 0, popoSub = 0, poSub = 0;
+                if (isRatioEnabled) {
+                    const ratio = productRatios[productName] || 50;
+                    popoAmt = amount * (ratio / 100);
+                    poAmt = amount * ((100 - ratio) / 100);
+                    popoSub = subtotal * (ratio / 100);
+                    poSub = subtotal * ((100 - ratio) / 100);
+                } else {
+                    if (selectedGroup === 1) {
+                        popoAmt = amount;
+                        popoSub = subtotal;
+                    } else {
+                        poAmt = amount;
+                        poSub = subtotal;
+                    }
+                }
+
+                if (!allMonthData[monthStr]) allMonthData[monthStr] = { popo: 0, po: 0, popoSub: 0, poSub: 0, count: 0 };
+                allMonthData[monthStr].popo += popoAmt;
+                allMonthData[monthStr].po += poAmt;
+                allMonthData[monthStr].popoSub += popoSub;
+                allMonthData[monthStr].poSub += poSub;
+                allMonthData[monthStr].count += 1;
+            });
+
+            const allMonths = Object.keys(allMonthData).sort();
+            
+            // 履歴データを統合
+            const allMonthsMap = {};
+            
+            // CSVから読み込んだ月データ
+            allMonths.forEach(m => {
+                const d = allMonthData[m];
+                const popo = Math.floor(d.popo);
+                const po = Math.floor(d.po);
+                const total = popo + po;
+                const popoS = Math.floor(d.popoSub);
+                const poS = Math.floor(d.poSub);
+                const sub = popoS + poS;
+                const boothFee = sub - total;
+                const ratio1 = total > 0 ? popo / total : 0.5;
+                const ratio2 = total > 0 ? po / total : 0.5;
+                const fee1 = transferFee * ratio1;
+                const fee2 = transferFee * ratio2;
+                const net1 = popo - fee1;
+                const net2 = po - fee2;
+                const netTotal = net1 + net2;
+                
+                allMonthsMap[m] = {
+                    month: m,
+                    popo, po, total,
+                    popoSub: popoS, poSub: poS, subtotal: sub,
+                    boothFee, count: d.count,
+                    ratio1, ratio2, fee1, fee2,
+                    net1, net2, netTotal
+                };
+            });
+            
+            // 全ての月を時系列順に並べる
+            const monthsInfo = Object.keys(allMonthsMap).sort().map(m => allMonthsMap[m]);
+            
+            if (monthsInfo.length === 0) {
+                document.getElementById('monthlyComparison').style.display = 'none';
+                return;
+            }
+
+            const latestMonth = monthsInfo[monthsInfo.length - 1];
+            const prevMonth = monthsInfo.length > 1 ? monthsInfo[monthsInfo.length - 2] : null;
+
+            let html = '';
+
+            // 今月
+            const latestBadge = `<span class="month-badge">今月</span>`;
+            let comparisonText = '';
+            if (prevMonth) {
+                const diff = Math.floor(latestMonth.netTotal - prevMonth.netTotal);
+                const diffPct = prevMonth.netTotal > 0 ? ((diff / prevMonth.netTotal) * 100).toFixed(1) : 0;
+                const isPos = diff >= 0;
+                comparisonText = `<span class="month-comparison-badge ${isPos ? 'positive' : 'negative'}">先月比 ${isPos ? '+' : ''}¥${diff.toLocaleString()} (${isPos ? '+' : ''}${diffPct}%) ${isPos ? '↑' : '↓'}</span>`;
+            }
+            
+            html += `
+                <div class="month-summary-item current-month" onclick="toggleMonthDetails('month_${latestMonth.month}')">
+                    <div class="month-summary-header">
+                        <div>
+                            <span class="month-summary-title">${latestMonth.month}</span>
+                            ${latestBadge}
+                            ${comparisonText}
+                        </div>
+                        <div class="month-summary-amount">¥${Math.floor(latestMonth.netTotal).toLocaleString()}</div>
+                    </div>
+                    <div class="month-details" id="month_${latestMonth.month}">
+                        <div class="month-details-grid">
+                            <div class="month-detail-item"><span class="month-detail-label">ぽぽ受取</span><span class="month-detail-value">¥${Math.floor(latestMonth.net1).toLocaleString()}</span></div>
+                            <div class="month-detail-item"><span class="month-detail-label">ぽ受取</span><span class="month-detail-value">¥${Math.floor(latestMonth.net2).toLocaleString()}</span></div>
+                            <div class="month-detail-item"><span class="month-detail-label">売上（手数料前）</span><span class="month-detail-value">¥${latestMonth.subtotal.toLocaleString()}</span></div>
+                            <div class="month-detail-item"><span class="month-detail-label">BOOTH手数料</span><span class="month-detail-value">-¥${Math.abs(latestMonth.boothFee).toLocaleString()}</span></div>
+                            <div class="month-detail-item"><span class="month-detail-label">手数料差引後</span><span class="month-detail-value">¥${latestMonth.total.toLocaleString()}</span></div>
+                            <div class="month-detail-item"><span class="month-detail-label">振込手数料</span><span class="month-detail-value">-¥${Math.floor(transferFee).toLocaleString()}</span></div>
+                            <div class="month-detail-item"><span class="month-detail-label">売上割合</span><span class="month-detail-value">ぽぽ ${(latestMonth.ratio1 * 100).toFixed(1)}% / ぽ ${(latestMonth.ratio2 * 100).toFixed(1)}%</span></div>
+                            <div class="month-detail-item"><span class="month-detail-label">販売件数</span><span class="month-detail-value">${latestMonth.count}件</span></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 過去の月（新しい順）
+            for (let i = monthsInfo.length - 2; i >= 0; i--) {
+                const m = monthsInfo[i];
+                html += `
+                    <div class="month-summary-item" onclick="toggleMonthDetails('month_${m.month}')">
+                        <div class="month-summary-header">
+                            <div><span class="month-summary-title">${m.month}</span></div>
+                            <div class="month-summary-amount">¥${Math.floor(m.netTotal).toLocaleString()}</div>
+                        </div>
+                        <div class="month-details" id="month_${m.month}">
+                            <div class="month-details-grid">
+                                <div class="month-detail-item"><span class="month-detail-label">ぽぽ受取</span><span class="month-detail-value">¥${Math.floor(m.net1).toLocaleString()}</span></div>
+                                <div class="month-detail-item"><span class="month-detail-label">ぽ受取</span><span class="month-detail-value">¥${Math.floor(m.net2).toLocaleString()}</span></div>
+                                <div class="month-detail-item"><span class="month-detail-label">売上（手数料前）</span><span class="month-detail-value">¥${m.subtotal.toLocaleString()}</span></div>
+                                <div class="month-detail-item"><span class="month-detail-label">BOOTH手数料</span><span class="month-detail-value">-¥${Math.abs(m.boothFee).toLocaleString()}</span></div>
+                                <div class="month-detail-item"><span class="month-detail-label">手数料差引後</span><span class="month-detail-value">¥${m.total.toLocaleString()}</span></div>
+                                <div class="month-detail-item"><span class="month-detail-label">振込手数料</span><span class="month-detail-value">-¥${Math.floor(transferFee).toLocaleString()}</span></div>
+                                <div class="month-detail-item"><span class="month-detail-label">売上割合</span><span class="month-detail-value">ぽぽ ${(m.ratio1 * 100).toFixed(1)}% / ぽ ${(m.ratio2 * 100).toFixed(1)}%</span></div>
+                                <div class="month-detail-item"><span class="month-detail-label">販売件数</span><span class="month-detail-value">${m.count}件</span></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            document.getElementById('monthlyComparisonContent').innerHTML = html;
+            document.getElementById('monthlyComparison').style.display = 'block';
+            
+            // 通算合算を計算
+            let totalPopo = 0, totalPo = 0, totalSub = 0;
+            let totalCount = 0;
+            monthsInfo.forEach(m => {
+                totalPopo += m.net1;
+                totalPo += m.net2;
+                totalSub += m.subtotal;
+                totalCount += m.count;
+            });
+            const totalNet = totalPopo + totalPo;
+            const totalBoothFee = totalSub - (monthsInfo.reduce((s, m) => s + m.total, 0));
+            const totalTransferFee = transferFee * monthsInfo.length;
+            const totalGrandTotal = monthsInfo.reduce((s, m) => s + m.total, 0);
+            const totalPopoRatio = totalGrandTotal > 0 ? (totalGrandTotal - totalPo) / totalGrandTotal : 0.5;
+            const totalPoRatio = totalGrandTotal > 0 ? totalPo / totalGrandTotal : 0.5;
+            
+            const cardStyle = `style="margin-top: 15px; padding: 10px 20px; background: white; color: #73C2FB; border: 2px solid white; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; transition: all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.9)'" onmouseout="this.style.background='white'"`;
+            const dividerStyle = `style="border-top: 1px solid rgba(255,255,255,0.3); margin: 12px 0;"`;
+            const rowStyle = `style="display:flex; justify-content:space-between; padding: 3px 0; font-size:0.9em;"`;
+            const labelStyle = `style="opacity:0.85;"`;
+            const valueStyle = `style="font-weight:600;"`;
+            
+            const totalSummaryHTML = `
+                <div class="result-card">
+                    <h3>ぽぽ（通算）</h3>
+                    <div class="result-amount">¥${Math.floor(totalPopo).toLocaleString()}</div>
+                    <div ${dividerStyle}></div>
+                    <div ${rowStyle}><span ${labelStyle}>売上合計（手数料前）</span><span ${valueStyle}>¥${Math.floor(monthsInfo.reduce((s, m) => s + m.popoSub, 0)).toLocaleString()}</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>BOOTH手数料</span><span ${valueStyle}>-¥${Math.floor(monthsInfo.reduce((s, m) => s + (m.popoSub - m.popo), 0)).toLocaleString()}</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>手数料差し引き後</span><span ${valueStyle}>¥${Math.floor(monthsInfo.reduce((s, m) => s + m.popo, 0)).toLocaleString()}</span></div>
+                    <div ${dividerStyle}></div>
+                    <div ${rowStyle}><span ${labelStyle}>販売件数</span><span ${valueStyle}>${totalCount}件</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>売上割合</span><span ${valueStyle}>${(totalPopoRatio * 100).toFixed(1)}%</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>振込手数料累計</span><span ${valueStyle}>-¥${Math.floor(monthsInfo.reduce((s, m) => s + m.fee1, 0)).toLocaleString()}</span></div>
+                    <div ${dividerStyle}></div>
+                    <div ${rowStyle}><span ${labelStyle}>受取金額</span><span style="font-weight:700; font-size:1.05em;">¥${Math.floor(totalPopo).toLocaleString()}</span></div>
+                </div>
+                <div class="result-card">
+                    <h3>ぽ（通算）</h3>
+                    <div class="result-amount">¥${Math.floor(totalPo).toLocaleString()}</div>
+                    <div ${dividerStyle}></div>
+                    <div ${rowStyle}><span ${labelStyle}>売上合計（手数料前）</span><span ${valueStyle}>¥${Math.floor(monthsInfo.reduce((s, m) => s + m.poSub, 0)).toLocaleString()}</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>BOOTH手数料</span><span ${valueStyle}>-¥${Math.floor(monthsInfo.reduce((s, m) => s + (m.poSub - m.po), 0)).toLocaleString()}</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>手数料差し引き後</span><span ${valueStyle}>¥${Math.floor(monthsInfo.reduce((s, m) => s + m.po, 0)).toLocaleString()}</span></div>
+                    <div ${dividerStyle}></div>
+                    <div ${rowStyle}><span ${labelStyle}>販売件数</span><span ${valueStyle}>${totalCount}件</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>売上割合</span><span ${valueStyle}>${(totalPoRatio * 100).toFixed(1)}%</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>振込手数料累計</span><span ${valueStyle}>-¥${Math.floor(monthsInfo.reduce((s, m) => s + m.fee2, 0)).toLocaleString()}</span></div>
+                    <div ${dividerStyle}></div>
+                    <div ${rowStyle}><span ${labelStyle}>受取金額</span><span style="font-weight:700; font-size:1.05em;">¥${Math.floor(totalPo).toLocaleString()}</span></div>
+                </div>
+                <div class="result-card">
+                    <h3>総合計（通算）</h3>
+                    <div class="result-amount">¥${Math.floor(totalNet).toLocaleString()}</div>
+                    <div ${dividerStyle}></div>
+                    <div ${rowStyle}><span ${labelStyle}>売上合計（手数料前）</span><span ${valueStyle}>¥${Math.floor(totalSub).toLocaleString()}</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>BOOTH手数料累計</span><span ${valueStyle}>-¥${Math.floor(Math.abs(totalBoothFee)).toLocaleString()}</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>手数料差し引き後</span><span ${valueStyle}>¥${Math.floor(totalGrandTotal).toLocaleString()}</span></div>
+                    <div ${dividerStyle}></div>
+                    <div ${rowStyle}><span ${labelStyle}>総販売件数</span><span ${valueStyle}>${totalCount}件</span></div>
+                    <div ${rowStyle}><span ${labelStyle}>振込手数料累計</span><span ${valueStyle}>-¥${Math.floor(totalTransferFee).toLocaleString()}</span></div>
+                    <div ${dividerStyle}></div>
+                    <div ${rowStyle}><span ${labelStyle}>受取金額</span><span style="font-weight:700; font-size:1.05em;">¥${Math.floor(totalNet).toLocaleString()}</span></div>
+                </div>
+            `;
+            
+            document.getElementById('totalSummaryCards').innerHTML = totalSummaryHTML;
+            document.getElementById('totalSummarySection').style.display = 'block';
+        }
+
+        function toggleMonthDetails(id) {
+            const details = document.getElementById(id);
+            if (details) {
+                details.classList.toggle('expanded');
+            }
+        }
+
+        // 初期化：スクリプト読み込み後に最初のファイル入力行を追加
+        document.addEventListener('DOMContentLoaded', () => { addFileInput(); });
 
         function addFileInput() {
             fileCounter++;
@@ -711,9 +1437,6 @@
             reader.readAsText(file, 'UTF-8');
         }
 
-        // 商品IDごとの代表名（最初に登場した名前を使用）
-        let productIdToName = {};
-
         function rebuildCsvData() {
             csvData = [];
             fileNames = [];
@@ -742,7 +1465,7 @@
             const uniqueProducts = new Set();
             csvData.forEach(row => uniqueProducts.add(row['商品名']));
 
-            // 新商品だけデフォルト設定（既存設定は保持）
+            // 新商品だけデフォルト設定（既存設定・preset設定は保持）
             uniqueProducts.forEach(product => {
                 if (productGroups[product] === undefined) productGroups[product] = 1;
                 if (productRatios[product] === undefined) productRatios[product] = 50;
@@ -806,17 +1529,31 @@
             const productList = document.getElementById('productList');
             productList.innerHTML = '';
             
-            products.sort().forEach(product => {
-                const ratio = productRatios[product] || 50;
+            // 設定済みを先に、新規を後に並べる
+            const sorted = [...products].sort((a, b) => {
+                const aPreset = !!presetProducts[a];
+                const bPreset = !!presetProducts[b];
+                if (aPreset !== bPreset) return aPreset ? -1 : 1;
+                return a.localeCompare(b, 'ja');
+            });
+
+            sorted.forEach(product => {
+                const isPreset = !!presetProducts[product];
+                const ratio = productRatios[product] ?? 50;
                 const popoRatio = ratio;
                 const poRatio = 100 - ratio;
                 const safeId = product.replace(/[^a-zA-Z0-9]/g, '_');
-                
+                const presetData = presetProducts[product];
+                const ratioEnabled = isPreset && presetData.ratioEnabled;
+
                 const div = document.createElement('div');
-                div.className = 'product-group-item';
+                div.className = `product-group-item${isPreset ? ' preset' : ''}`;
                 div.innerHTML = `
                     <div class="product-row">
-                        <div class="product-name">${product}</div>
+                        <div class="product-name">
+                            ${product}
+                            ${isPreset ? '<span class="preset-badge">設定済み</span>' : ''}
+                        </div>
                         <div class="group-selector">
                             <button class="group-btn ${productGroups[product] === 1 ? 'active' : ''}" 
                                     onclick="setGroup('${product.replace(/'/g, "\\'")}', 1)">ぽぽ</button>
@@ -824,11 +1561,11 @@
                                     onclick="setGroup('${product.replace(/'/g, "\\'")}', 2)">ぽ</button>
                         </div>
                     </div>
-                    <label class="ratio-toggle">
-                        <input type="checkbox" onchange="toggleRatioSlider('${safeId}')">
+                    <label class="ratio-toggle" ${isPreset ? 'style="pointer-events:none;"' : ''}>
+                        <input type="checkbox" id="check_${safeId}" ${ratioEnabled ? 'checked' : ''} onchange="toggleRatioSlider('${safeId}')">
                         利益分配割合を設定する
                     </label>
-                    <div class="ratio-controls" id="ratio_${safeId}">
+                    <div class="ratio-controls ${ratioEnabled ? 'active' : ''}" id="ratio_${safeId}">
                         <div style="min-width: 80px; font-weight: 600; color: #73C2FB;">利益分配:</div>
                         <div class="ratio-slider-container">
                             <input type="range" min="0" max="100" step="5" value="${ratio}" 
@@ -950,6 +1687,20 @@
         function displayResults() {
             const transferFee = parseFloat(document.getElementById('transferFee').value) || 0;
             
+            // 最新月を特定
+            const allMonthsSet = new Set();
+            csvData.forEach(row => {
+                const rawDate = (row['注文日時'] || '').split(' ')[0];
+                if (!rawDate) return;
+                const dateStr = rawDate.replace(/\//g, '-');
+                const monthStr = dateStr.substring(0, 7);
+                allMonthsSet.add(monthStr);
+            });
+            
+            const allMonths = Array.from(allMonthsSet).sort();
+            const latestMonth = allMonths[allMonths.length - 1] || '';
+            
+            // 全期間のデータで集計（青いカードは今まで通り）
             const group1Results = results.filter(r => r.group === 1);
             const group2Results = results.filter(r => r.group === 2);
 
@@ -987,7 +1738,7 @@
             const summaryCards = document.getElementById('summaryCards');
             summaryCards.innerHTML = `
                 <div class="result-card">
-                    <h3>ぽぽ</h3>
+                    <h3>ぽぽ${latestMonth ? `（${latestMonth}）` : ''}</h3>
                     <div class="result-amount">¥${Math.floor(group1Net).toLocaleString()}</div>
                     <div ${dividerStyle}></div>
                     <div ${rowStyle}><span ${labelStyle}>売上合計（手数料前）</span><span ${valueStyle}>¥${Math.floor(group1Subtotal).toLocaleString()}</span></div>
@@ -1003,7 +1754,7 @@
                     <button onclick="downloadGroupCSV(1)" ${cardStyle}>CSVを保存</button>
                 </div>
                 <div class="result-card">
-                    <h3>ぽ</h3>
+                    <h3>ぽ${latestMonth ? `（${latestMonth}）` : ''}</h3>
                     <div class="result-amount">¥${Math.floor(group2Net).toLocaleString()}</div>
                     <div ${dividerStyle}></div>
                     <div ${rowStyle}><span ${labelStyle}>売上合計（手数料前）</span><span ${valueStyle}>¥${Math.floor(group2Subtotal).toLocaleString()}</span></div>
@@ -1019,7 +1770,7 @@
                     <button onclick="downloadGroupCSV(2)" ${cardStyle}>CSVを保存</button>
                 </div>
                 <div class="result-card">
-                    <h3>総合計</h3>
+                    <h3>総合計${latestMonth ? `（${latestMonth}）` : ''}</h3>
                     <div class="result-amount">¥${Math.floor(grandTotal - transferFee).toLocaleString()}</div>
                     <div ${dividerStyle}></div>
                     <div ${rowStyle}><span ${labelStyle}>売上合計（手数料前）</span><span ${valueStyle}>¥${Math.floor(grandSubtotal).toLocaleString()}</span></div>
@@ -1065,6 +1816,117 @@
             tableHTML += '</tbody>';
             document.getElementById('detailsTable').innerHTML = tableHTML;
             document.getElementById('results').style.display = 'block';
+
+            // 日別売上を計算・準備
+            prepareDailySales();
+
+            // 月別比較を表示
+            displayMonthlyComparison();
+
+            // グラフを描画
+            buildChartData();
+            document.getElementById('chartSection').style.display = 'block';
+            renderDailyChart();
+            renderMonthlyChart();
+            renderForecastChart();
+        }
+
+        function prepareDailySales() {
+            // 最新月のデータのみで日別売上を計算
+            const allMonthData = {};
+            csvData.forEach(row => {
+                const rawDate = (row['注文日時'] || '').split(' ')[0];
+                if (!rawDate) return;
+                const dateStr = rawDate.replace(/\//g, '-');
+                const monthStr = dateStr.substring(0, 7);
+                if (!allMonthData[monthStr]) allMonthData[monthStr] = [];
+                allMonthData[monthStr].push(row);
+            });
+            
+            const allMonths = Object.keys(allMonthData).sort();
+            const latestMonth = allMonths[allMonths.length - 1];
+            const latestMonthRows = allMonthData[latestMonth] || csvData;
+            
+            // 日別集計
+            const dailyData = {};
+            latestMonthRows.forEach(row => {
+                const productName = row['商品名'];
+                const amount = parseFloat(row['受取金額']) || 0;
+                const rawDate = (row['注文日時'] || '').split(' ')[0];
+                if (!rawDate) return;
+                const dateStr = rawDate.replace(/\//g, '-');
+                
+                const selectedGroup = productGroups[productName] || 1;
+                const safeId = productName.replace(/[^a-zA-Z0-9]/g, '_');
+                const ratioEl = document.getElementById(`ratio_${safeId}`);
+                const isRatioEnabled = ratioEl && ratioEl.classList.contains('active');
+                
+                let popoAmt = 0, poAmt = 0;
+                if (isRatioEnabled) {
+                    const ratio = productRatios[productName] || 50;
+                    popoAmt = amount * (ratio / 100);
+                    poAmt = amount * ((100 - ratio) / 100);
+                } else {
+                    if (selectedGroup === 1) popoAmt = amount;
+                    else poAmt = amount;
+                }
+                
+                if (!dailyData[dateStr]) dailyData[dateStr] = { popo: 0, po: 0 };
+                dailyData[dateStr].popo += popoAmt;
+                dailyData[dateStr].po += poAmt;
+            });
+            
+            // 日付順にソート（新しい順）
+            const sortedDates = Object.keys(dailyData).sort().reverse();
+            
+            // HTML生成
+            let popoHTML = '';
+            let poHTML = '';
+            let totalHTML = '';
+            
+            sortedDates.forEach(date => {
+                const d = dailyData[date];
+                const popo = Math.floor(d.popo);
+                const po = Math.floor(d.po);
+                const total = popo + po;
+                
+                popoHTML += `<div class="daily-sales-item"><span class="daily-sales-date">${date}</span><span class="daily-sales-amount">¥${popo.toLocaleString()}</span></div>`;
+                poHTML += `<div class="daily-sales-item"><span class="daily-sales-date">${date}</span><span class="daily-sales-amount">¥${po.toLocaleString()}</span></div>`;
+                totalHTML += `<div class="daily-sales-item"><span class="daily-sales-date">${date}</span><span class="daily-sales-amount">¥${total.toLocaleString()}</span></div>`;
+            });
+            
+            const contentHTML = `
+                <div class="daily-sales-grid">
+                    <div class="daily-sales-column popo">
+                        <h4>ぽぽ</h4>
+                        ${popoHTML}
+                    </div>
+                    <div class="daily-sales-column po">
+                        <h4>ぽ</h4>
+                        ${poHTML}
+                    </div>
+                    <div class="daily-sales-column total">
+                        <h4>合計</h4>
+                        ${totalHTML}
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('dailySalesContent').innerHTML = contentHTML;
+            document.getElementById('dailySalesSection').style.display = 'block';
+        }
+
+        function toggleDailySales() {
+            const content = document.getElementById('dailySalesContent');
+            const btn = document.getElementById('dailySalesToggleBtn');
+            
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                btn.textContent = '隠す';
+            } else {
+                content.style.display = 'none';
+                btn.textContent = '表示';
+            }
         }
 
         function downloadResultsSummary() {
@@ -1434,6 +2296,176 @@
                 closeModal();
             }
         }
+
+        // ====== グラフ関連 ======
+        let chartInstances = {};
+        let chartData = { daily: {}, monthly: {} };
+
+        function switchTab(name) {
+            document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.chart-panel').forEach(p => p.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(`panel-${name}`).classList.add('active');
+        }
+
+        function buildChartData() {
+            const daily = {};
+            const monthly = {};
+
+            csvData.forEach(row => {
+                const productName = row['商品名'];
+                const amount = parseFloat(row['受取金額']) || 0;
+                if (amount <= 0) return;
+
+                const rawDate = (row['注文日時'] || '').split(' ')[0];
+                if (!rawDate) return;
+                // YYYY/MM/DD と YYYY-MM-DD 両方に対応して YYYY-MM-DD 形式に正規化
+                const dateStr = rawDate.replace(/\//g, '-');
+                const monthStr = dateStr.substring(0, 7); // YYYY-MM
+
+                const selectedGroup = productGroups[productName] || 1;
+                const safeId = productName.replace(/[^a-zA-Z0-9]/g, '_');
+                const ratioEl = document.getElementById(`ratio_${safeId}`);
+                const isRatioEnabled = ratioEl && ratioEl.classList.contains('active');
+
+                let popoAmt = 0, poAmt = 0;
+                if (isRatioEnabled) {
+                    const ratio = productRatios[productName] || 50;
+                    popoAmt = amount * (ratio / 100);
+                    poAmt   = amount * ((100 - ratio) / 100);
+                } else {
+                    if (selectedGroup === 1) popoAmt = amount;
+                    else poAmt = amount;
+                }
+
+                if (!daily[dateStr]) daily[dateStr] = { popo: 0, po: 0 };
+                daily[dateStr].popo += popoAmt;
+                daily[dateStr].po   += poAmt;
+
+                if (!monthly[monthStr]) monthly[monthStr] = { popo: 0, po: 0 };
+                monthly[monthStr].popo += popoAmt;
+                monthly[monthStr].po   += poAmt;
+            });
+
+            chartData.daily   = daily;
+            chartData.monthly = monthly;
+        }
+
+        function renderDailyChart() {
+            const showPopo  = document.getElementById('daily-popo').checked;
+            const showPo    = document.getElementById('daily-po').checked;
+            const showTotal = document.getElementById('daily-total').checked;
+
+            const labels = Object.keys(chartData.daily).sort();
+            const popoVals  = labels.map(d => Math.floor(chartData.daily[d].popo));
+            const poVals    = labels.map(d => Math.floor(chartData.daily[d].po));
+            const totalVals = labels.map(d => Math.floor(chartData.daily[d].popo + chartData.daily[d].po));
+
+            const datasets = [];
+            if (showPopo)  datasets.push({ label: 'ぽぽ', data: popoVals,  borderColor: '#73C2FB', backgroundColor: 'rgba(115,194,251,0.15)', tension: 0.3, fill: true, pointRadius: 3 });
+            if (showPo)    datasets.push({ label: 'ぽ',   data: poVals,    borderColor: '#ADE0EE', backgroundColor: 'rgba(173,224,238,0.15)', tension: 0.3, fill: true, pointRadius: 3 });
+            if (showTotal) datasets.push({ label: '合計', data: totalVals, borderColor: '#5AB3F5', backgroundColor: 'rgba(90,179,245,0.08)',  tension: 0.3, fill: false, borderDash: [5,3], pointRadius: 3 });
+
+            drawChart('dailyChart', 'line', labels, datasets);
+        }
+
+        function renderMonthlyChart() {
+            const showPopo  = document.getElementById('monthly-popo').checked;
+            const showPo    = document.getElementById('monthly-po').checked;
+            const showTotal = document.getElementById('monthly-total').checked;
+
+            const labels = Object.keys(chartData.monthly).sort();
+            const popoVals  = labels.map(m => Math.floor(chartData.monthly[m].popo));
+            const poVals    = labels.map(m => Math.floor(chartData.monthly[m].po));
+            const totalVals = labels.map(m => Math.floor(chartData.monthly[m].popo + chartData.monthly[m].po));
+
+            const datasets = [];
+            if (showPopo)  datasets.push({ label: 'ぽぽ', data: popoVals,  backgroundColor: 'rgba(115,194,251,0.7)', borderColor: '#73C2FB', borderWidth: 2 });
+            if (showPo)    datasets.push({ label: 'ぽ',   data: poVals,    backgroundColor: 'rgba(173,224,238,0.8)', borderColor: '#ADE0EE', borderWidth: 2 });
+            if (showTotal) datasets.push({ label: '合計', data: totalVals, backgroundColor: 'rgba(90,179,245,0.35)', borderColor: '#5AB3F5', borderWidth: 2 });
+
+            drawChart('monthlyChart', 'bar', labels, datasets);
+        }
+
+        function renderForecastChart() {
+            const target = document.querySelector('input[name="forecast-group"]:checked').value;
+            const months = parseInt(document.getElementById('forecastMonths').value);
+            const monthKeys = Object.keys(chartData.monthly).sort();
+            if (monthKeys.length === 0) return;
+
+            const actualVals = monthKeys.map(m => {
+                const d = chartData.monthly[m];
+                if (target === 'popo') return Math.floor(d.popo);
+                if (target === 'po')   return Math.floor(d.po);
+                return Math.floor(d.popo + d.po);
+            });
+
+            // 線形回帰
+            const n = actualVals.length;
+            const xs = actualVals.map((_, i) => i);
+            const meanX = xs.reduce((a, b) => a + b, 0) / n;
+            const meanY = actualVals.reduce((a, b) => a + b, 0) / n;
+            const denom = xs.reduce((s, x) => s + (x - meanX) ** 2, 0);
+            const slope = denom === 0 ? 0 :
+                xs.reduce((s, x, i) => s + (x - meanX) * (actualVals[i] - meanY), 0) / denom;
+            const intercept = meanY - slope * meanX;
+
+            // 予測月を生成（安全なパース）
+            const lastKey = monthKeys[monthKeys.length - 1];
+            const parts = lastKey.split('-');
+            const ly = parseInt(parts[0], 10);
+            const lm = parseInt(parts[1], 10);
+            if (isNaN(ly) || isNaN(lm)) return;
+
+            const forecastLabels = [];
+            const forecastVals   = [];
+            for (let i = 1; i <= months; i++) {
+                let nm = lm + i;
+                let ny = ly + Math.floor((nm - 1) / 12);
+                nm = ((nm - 1) % 12) + 1;
+                forecastLabels.push(`${ny}-${String(nm).padStart(2,'0')}`);
+                const predicted = intercept + slope * (n - 1 + i);
+                forecastVals.push(Math.max(0, Math.round(isNaN(predicted) ? meanY : predicted)));
+            }
+
+            const allLabels    = [...monthKeys, ...forecastLabels];
+            const actualData   = [...actualVals, ...Array(months).fill(null)];
+            const forecastData = [...Array(n - 1).fill(null), actualVals[n - 1], ...forecastVals];
+
+            const targetLabel = target === 'popo' ? 'ぽぽ' : target === 'po' ? 'ぽ' : '合計';
+            drawChart('forecastChart', 'line', allLabels, [
+                { label: `${targetLabel}（実績）`, data: actualData,   borderColor: '#73C2FB', backgroundColor: 'rgba(115,194,251,0.15)', tension: 0.3, fill: true,  pointRadius: 4 },
+                { label: `${targetLabel}（予測）`, data: forecastData, borderColor: '#F5A623', backgroundColor: 'rgba(245,166,35,0.1)',    tension: 0.3, fill: false, borderDash: [6,4], pointRadius: 4 },
+            ]);
+
+            const trend = isNaN(slope) || slope === 0 ? '横ばい傾向'
+                : slope >= 0 ? `月約 ¥${Math.round(slope).toLocaleString()} の増加傾向`
+                             : `月約 ¥${Math.abs(Math.round(slope)).toLocaleString()} の減少傾向`;
+            const nextVal = forecastVals[0] ?? 0;
+            document.getElementById('forecastNote').innerHTML =
+                `<strong>予測について：</strong>過去 ${n} ヶ月の実績をもとに線形回帰で算出。${trend}が見られます。来月の予測は <strong>¥${nextVal.toLocaleString()}</strong> です。データ数が少ない場合や季節変動がある場合は参考値としてご利用ください。`;
+        }
+
+        function drawChart(id, type, labels, datasets) {
+            if (chartInstances[id]) chartInstances[id].destroy();
+            const ctx = document.getElementById(id).getContext('2d');
+            chartInstances[id] = new Chart(ctx, {
+                type,
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: { callbacks: { label: c => ` ¥${(c.parsed.y ?? 0).toLocaleString()}` } }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { callback: v => '¥' + v.toLocaleString() } }
+                    }
+                }
+            });
+        }
+        // ====== グラフ関連ここまで ======
     </script>
 </body>
 </html>
