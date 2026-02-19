@@ -1092,7 +1092,10 @@
                     
                     if (hasSettings) {
                         // 統合CSVファイル
+                        // 現在のcsvDataとrawDataMapをクリア（統合CSVで置き換える）
                         csvData = [];
+                        rawDataMap = {};
+                        fileNames = [];
                         presetProducts = {};
                         productGroups = {};
                         productRatios = {};
@@ -1128,9 +1131,12 @@
                             csvData.push(cleanRow);
                         });
                         
-                        document.getElementById('settingsLoadedMsg').textContent = `統合ファイルを読み込みました（${Object.keys(presetProducts).length}商品の設定を復元）`;
+                        // 統合CSVのファイル名を記録
+                        originalFileName = file.name.replace('.csv', '').replace('booth_unified_', '');
+                        
+                        document.getElementById('settingsLoadedMsg').textContent = `統合CSVを読み込みました（${Object.keys(presetProducts).length}商品の設定、全${csvData.length}件のデータ）`;
                         document.getElementById('settingsLoadedMsg').style.display = 'block';
-                        setTimeout(() => document.getElementById('settingsLoadedMsg').style.display = 'none', 3000);
+                        setTimeout(() => document.getElementById('settingsLoadedMsg').style.display = 'none', 4000);
                         
                         // 商品リスト表示
                         const uniqueProducts = new Set(csvData.map(r => r['商品名']));
@@ -1700,9 +1706,94 @@
             const allMonths = Array.from(allMonthsSet).sort();
             const latestMonth = allMonths[allMonths.length - 1] || '';
             
-            // 全期間のデータで集計（青いカードは今まで通り）
-            const group1Results = results.filter(r => r.group === 1);
-            const group2Results = results.filter(r => r.group === 2);
+            // 最新月のresultsのみをフィルタ
+            const latestMonthResults = results.filter(result => {
+                // このresultに対応するCSVデータの月を確認
+                const productName = result.product;
+                const hasLatestMonthData = csvData.some(row => {
+                    if (row['商品名'] !== productName) return false;
+                    const rawDate = (row['注文日時'] || '').split(' ')[0];
+                    if (!rawDate) return false;
+                    const dateStr = rawDate.replace(/\//g, '-');
+                    const monthStr = dateStr.substring(0, 7);
+                    return monthStr === latestMonth;
+                });
+                return hasLatestMonthData;
+            });
+            
+            // 最新月のみで再集計
+            const latestMonthData = csvData.filter(row => {
+                const rawDate = (row['注文日時'] || '').split(' ')[0];
+                if (!rawDate) return false;
+                const dateStr = rawDate.replace(/\//g, '-');
+                const monthStr = dateStr.substring(0, 7);
+                return monthStr === latestMonth;
+            });
+            
+            // 最新月のデータで集計し直す
+            const latestAggregation = {};
+            latestMonthData.forEach(row => {
+                const productName = row['商品名'];
+                const amount = parseFloat(row['受取金額']) || 0;
+                const subtotal = parseFloat(row['小計']) || 0;
+                const selectedGroup = productGroups[productName] || 1;
+                const safeId = productName.replace(/[^a-zA-Z0-9]/g, '_');
+                const ratioCheckbox = document.getElementById(`ratio_${safeId}`);
+                
+                const isRatioEnabled = ratioCheckbox && ratioCheckbox.classList.contains('active');
+                
+                if (isRatioEnabled) {
+                    const ratio = productRatios[productName] || 50;
+                    const popoAmount = amount * (ratio / 100);
+                    const poAmount = amount * ((100 - ratio) / 100);
+                    const popoSubtotal = subtotal * (ratio / 100);
+                    const poSubtotal = subtotal * ((100 - ratio) / 100);
+                    
+                    if (popoAmount > 0 || popoSubtotal > 0) {
+                        const popoKey = `${productName}|||1`;
+                        if (!latestAggregation[popoKey]) {
+                            latestAggregation[popoKey] = { product: productName, group: 1, amount: 0, subtotal: 0, count: 0, ratio: ratio, isDivided: true };
+                        }
+                        if (amount > 0 || subtotal > 0) {
+                            latestAggregation[popoKey].amount += popoAmount;
+                            latestAggregation[popoKey].subtotal += popoSubtotal;
+                            latestAggregation[popoKey].count += 1;
+                        }
+                    }
+                    
+                    if (poAmount > 0 || poSubtotal > 0) {
+                        const poKey = `${productName}|||2`;
+                        if (!latestAggregation[poKey]) {
+                            latestAggregation[poKey] = { product: productName, group: 2, amount: 0, subtotal: 0, count: 0, ratio: 100 - ratio, isDivided: true };
+                        }
+                        if (amount > 0 || subtotal > 0) {
+                            latestAggregation[poKey].amount += poAmount;
+                            latestAggregation[poKey].subtotal += poSubtotal;
+                            latestAggregation[poKey].count += 1;
+                        }
+                    }
+                } else {
+                    const key = `${productName}|||${selectedGroup}`;
+                    if (!latestAggregation[key]) {
+                        latestAggregation[key] = { product: productName, group: selectedGroup, amount: 0, subtotal: 0, count: 0, ratio: 100, isDivided: false };
+                    }
+                    if (amount > 0 || subtotal > 0) {
+                        latestAggregation[key].amount += amount;
+                        latestAggregation[key].subtotal += subtotal;
+                        latestAggregation[key].count += 1;
+                    }
+                }
+            });
+            
+            const latestResultsArray = Object.values(latestAggregation)
+                .filter(r => r.amount > 0 || r.subtotal > 0)
+                .sort((a, b) => {
+                    if (a.group !== b.group) return a.group - b.group;
+                    return b.amount - a.amount;
+                });
+            
+            const group1Results = latestResultsArray.filter(r => r.group === 1);
+            const group2Results = latestResultsArray.filter(r => r.group === 2);
 
             const group1Total = group1Results.reduce((sum, r) => sum + r.amount, 0);
             const group2Total = group2Results.reduce((sum, r) => sum + r.amount, 0);
