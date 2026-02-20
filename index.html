@@ -954,8 +954,11 @@
             
             <!-- 月別比較（コンパクト版） -->
             <div class="monthly-comparison" id="monthlyComparison" style="display:none; margin-top:30px;">
-                <h3 style="color:#333; margin-bottom:15px;">月別データ</h3>
-                <div id="monthlyComparisonContent"></div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <h3 style="color:#333; margin:0;">月別データ</h3>
+                    <button class="expand-btn" onclick="toggleMonthlyData()" id="monthlyDataToggleBtn">表示</button>
+                </div>
+                <div id="monthlyComparisonContent" style="display:none;"></div>
             </div>
             
             <!-- 通算合算 -->
@@ -971,7 +974,10 @@
         <div class="csv-viewer-section" id="csvViewerSection" style="display:none; margin-top:50px; padding:30px; background:white; border-radius:12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                 <h2 style="color:#333; margin:0;">CSV閲覧</h2>
-                <button class="expand-btn" onclick="toggleCsvViewer()" id="csvViewerToggleBtn">表示</button>
+                <div style="display:flex; gap:10px;">
+                    <button class="expand-btn" onclick="toggleDetailColumns()" id="detailColumnsBtn">詳細列を表示</button>
+                    <button class="expand-btn" onclick="toggleCsvViewer()" id="csvViewerToggleBtn">表示</button>
+                </div>
             </div>
             <div id="csvViewerContent" style="display:none;">
                 <div style="margin-bottom:15px; padding:15px; background:#f8f9fa; border-radius:8px;">
@@ -979,6 +985,23 @@
                 </div>
                 <div style="overflow-x:auto; max-height:600px; overflow-y:auto; border:1px solid #ddd; border-radius:8px;">
                     <table id="csvViewerTable" style="width:100%; border-collapse:collapse; background:white; font-size:0.85em;">
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- リピーター分析セクション -->
+        <div class="repeater-section" id="repeaterSection" style="display:none; margin-top:30px; padding:30px; background:white; border-radius:12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h2 style="color:#333; margin:0;">リピーター分析</h2>
+                <button class="expand-btn" onclick="toggleRepeaterAnalysis()" id="repeaterToggleBtn">表示</button>
+            </div>
+            <div id="repeaterContent" style="display:none;">
+                <div style="margin-bottom:15px; padding:15px; background:#f8f9fa; border-radius:8px;">
+                    <p style="margin:0; color:#666;">リピーター（2回以上購入）: <strong id="repeaterCount">0</strong>人</p>
+                </div>
+                <div style="overflow-x:auto; max-height:600px; overflow-y:auto; border:1px solid #ddd; border-radius:8px;">
+                    <table id="repeaterTable" style="width:100%; border-collapse:collapse; background:white; font-size:0.9em;">
                     </table>
                 </div>
             </div>
@@ -1216,6 +1239,12 @@
                 document.getElementById('monthlyComparison').style.display = 'none';
                 return;
             }
+            
+            // 月の数字を抽出（例：2026-02 → 2月）
+            const getMonthNumber = (monthStr) => {
+                const parts = monthStr.split('-');
+                return parseInt(parts[1]) + '月';
+            };
 
             const transferFee = parseFloat(document.getElementById('transferFee').value) || 0;
 
@@ -1319,71 +1348,141 @@
                 comparisonText = `<span class="month-comparison-badge ${isPos ? 'positive' : 'negative'}">先月比 ${isPos ? '+' : ''}¥${diff.toLocaleString()} (${isPos ? '+' : ''}${diffPct}%) ${isPos ? '↑' : '↓'}</span>`;
             }
             
+            const cardStyle = `style="margin-top: 15px; padding: 10px 20px; background: white; color: #73C2FB; border: 2px solid white; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; transition: all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.9)'" onmouseout="this.style.background='white'"`;
+            const dividerStyle = `style="border-top: 1px solid rgba(255,255,255,0.3); margin: 12px 0;"`;
+            const rowStyle = `style="display:flex; justify-content:space-between; padding: 3px 0; font-size:0.9em;"`;
+            const labelStyle = `style="opacity:0.85;"`;
+            const valueStyle = `style="font-weight:600;"`;
+            
             html += `
-                <div class="month-summary-item current-month" onclick="toggleMonthDetails('month_${latestMonth.month}')">
-                    <div class="month-summary-header">
+                <div style="margin-bottom:20px; border:1px solid #ddd; border-radius:8px; overflow:hidden;">
+                    <div onclick="toggleMonthCard('card_${latestMonth.month}')" style="padding:15px 20px; background:#f8f9fa; cursor:pointer; display:flex; justify-content:space-between; align-items:center; transition: background 0.3s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#f8f9fa'">
                         <div>
-                            <span class="month-summary-title">${latestMonth.month}</span>
+                            <span style="font-size:1.3em; font-weight:700; color:#333;">${getMonthNumber(latestMonth.month)}</span>
                             ${latestBadge}
                             ${comparisonText}
+                            <span style="margin-left:10px; color:#999; font-size:0.9em;">(${latestMonth.month})</span>
                         </div>
-                        <div class="month-summary-amount">¥${Math.floor(latestMonth.netTotal).toLocaleString()}</div>
+                        <div style="font-size:1.1em; font-weight:600; color:#73C2FB;">
+                            ¥${Math.floor(latestMonth.netTotal).toLocaleString()}
+                            <span style="margin-left:10px; color:#999; font-size:0.8em;" id="toggle_card_${latestMonth.month}">▼</span>
+                        </div>
                     </div>
-                    <div class="month-details" id="month_${latestMonth.month}">
-                        <div class="month-details-grid">
-                            <div class="month-detail-item"><span class="month-detail-label">ぽぽ（手数料前）</span><span class="month-detail-value">¥${Math.floor(latestMonth.popoSub).toLocaleString()}</span></div>
-                            <div class="month-detail-item"><span class="month-detail-label">ぽぽ（手数料後）</span><span class="month-detail-value">¥${Math.floor(latestMonth.popo).toLocaleString()}</span></div>
-                            <div class="month-detail-item"><span class="month-detail-label">ぽぽ受取</span><span class="month-detail-value" style="font-weight:700; color:#73C2FB;">¥${Math.floor(latestMonth.net1).toLocaleString()}</span></div>
-                            <div class="month-detail-item"><span class="month-detail-label">ぽ（手数料前）</span><span class="month-detail-value">¥${Math.floor(latestMonth.poSub).toLocaleString()}</span></div>
-                            <div class="month-detail-item"><span class="month-detail-label">ぽ（手数料後）</span><span class="month-detail-value">¥${Math.floor(latestMonth.po).toLocaleString()}</span></div>
-                            <div class="month-detail-item"><span class="month-detail-label">ぽ受取</span><span class="month-detail-value" style="font-weight:700; color:#ADE0EE;">¥${Math.floor(latestMonth.net2).toLocaleString()}</span></div>
-                            <div class="month-detail-item"><span class="month-detail-label">売上合計（手数料前）</span><span class="month-detail-value">¥${latestMonth.subtotal.toLocaleString()}</span></div>
-                            <div class="month-detail-item"><span class="month-detail-label">BOOTH手数料</span><span class="month-detail-value">-¥${Math.abs(latestMonth.boothFee).toLocaleString()}</span></div>
-                            <div class="month-detail-item"><span class="month-detail-label">手数料差引後</span><span class="month-detail-value">¥${latestMonth.total.toLocaleString()}</span></div>
-                            <div class="month-detail-item"><span class="month-detail-label">振込手数料</span><span class="month-detail-value">-¥${Math.floor(transferFee).toLocaleString()}</span></div>
-                            <div class="month-detail-item"><span class="month-detail-label">売上割合</span><span class="month-detail-value">ぽぽ ${(latestMonth.ratio1 * 100).toFixed(1)}% / ぽ ${(latestMonth.ratio2 * 100).toFixed(1)}%</span></div>
-                            <div class="month-detail-item"><span class="month-detail-label">販売件数</span><span class="month-detail-value">${latestMonth.count}件</span></div>
+                    <div id="card_${latestMonth.month}" style="display:none; padding:20px;">
+                        <div class="results-grid">
+                            <div class="result-card">
+                                <h3>ぽぽ</h3>
+                                <div class="result-amount">¥${Math.floor(latestMonth.net1).toLocaleString()}</div>
+                                <div ${dividerStyle}></div>
+                                <div ${rowStyle}><span ${labelStyle}>売上合計（手数料前）</span><span ${valueStyle}>¥${Math.floor(latestMonth.popoSub).toLocaleString()}</span></div>
+                                <div ${rowStyle}><span ${labelStyle}>BOOTH手数料</span><span ${valueStyle}>-¥${Math.floor(Math.abs(latestMonth.popoSub - latestMonth.popo)).toLocaleString()}</span></div>
+                                <div ${rowStyle}><span ${labelStyle}>手数料差し引き後</span><span ${valueStyle}>¥${Math.floor(latestMonth.popo).toLocaleString()}</span></div>
+                                <div ${dividerStyle}></div>
+                                <div ${rowStyle}><span ${labelStyle}>販売件数</span><span ${valueStyle}>${latestMonth.count}件</span></div>
+                                <div ${rowStyle}><span ${labelStyle}>売上割合</span><span ${valueStyle}>${(latestMonth.ratio1 * 100).toFixed(1)}%</span></div>
+                                <div ${rowStyle}><span ${labelStyle}>振込手数料</span><span ${valueStyle}>-¥${Math.floor(latestMonth.fee1).toLocaleString()}</span></div>
+                                <div ${dividerStyle}></div>
+                                <div ${rowStyle}><span ${labelStyle}>受取金額</span><span style="font-weight:700; font-size:1.05em;">¥${Math.floor(latestMonth.net1).toLocaleString()}</span></div>
+                                <button onclick="downloadMonthCSV('${latestMonth.month}', 1)" ${cardStyle}>CSVを保存</button>
+                            </div>
+                            <div class="result-card">
+                            <h3>ぽ</h3>
+                            <div class="result-amount">¥${Math.floor(latestMonth.net2).toLocaleString()}</div>
+                            <div ${dividerStyle}></div>
+                            <div ${rowStyle}><span ${labelStyle}>売上合計（手数料前）</span><span ${valueStyle}>¥${Math.floor(latestMonth.poSub).toLocaleString()}</span></div>
+                            <div ${rowStyle}><span ${labelStyle}>BOOTH手数料</span><span ${valueStyle}>-¥${Math.floor(Math.abs(latestMonth.poSub - latestMonth.po)).toLocaleString()}</span></div>
+                            <div ${rowStyle}><span ${labelStyle}>手数料差し引き後</span><span ${valueStyle}>¥${Math.floor(latestMonth.po).toLocaleString()}</span></div>
+                            <div ${dividerStyle}></div>
+                            <div ${rowStyle}><span ${labelStyle}>販売件数</span><span ${valueStyle}>${latestMonth.count}件</span></div>
+                            <div ${rowStyle}><span ${labelStyle}>売上割合</span><span ${valueStyle}>${(latestMonth.ratio2 * 100).toFixed(1)}%</span></div>
+                            <div ${rowStyle}><span ${labelStyle}>振込手数料</span><span ${valueStyle}>-¥${Math.floor(latestMonth.fee2).toLocaleString()}</span></div>
+                            <div ${dividerStyle}></div>
+                            <div ${rowStyle}><span ${labelStyle}>受取金額</span><span style="font-weight:700; font-size:1.05em;">¥${Math.floor(latestMonth.net2).toLocaleString()}</span></div>
+                            <button onclick="downloadMonthCSV('${latestMonth.month}', 2)" ${cardStyle}>CSVを保存</button>
                         </div>
-                        <div style="display:flex; gap:10px; margin-top:15px; padding-top:15px; border-top:1px solid #eee;">
-                            <button onclick="event.stopPropagation(); downloadMonthCSV('${latestMonth.month}', 1)" style="flex:1; padding:10px; background:#73C2FB; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">ぽぽのCSV保存</button>
-                            <button onclick="event.stopPropagation(); downloadMonthCSV('${latestMonth.month}', 2)" style="flex:1; padding:10px; background:#ADE0EE; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">ぽのCSV保存</button>
-                            <button onclick="event.stopPropagation(); downloadMonthCSV('${latestMonth.month}', 0)" style="flex:1; padding:10px; background:#5AB3F5; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">総合計CSV保存</button>
+                        <div class="result-card">
+                            <h3>総合計</h3>
+                            <div class="result-amount">¥${Math.floor(latestMonth.netTotal).toLocaleString()}</div>
+                            <div ${dividerStyle}></div>
+                            <div ${rowStyle}><span ${labelStyle}>売上合計（手数料前）</span><span ${valueStyle}>¥${Math.floor(latestMonth.subtotal).toLocaleString()}</span></div>
+                            <div ${rowStyle}><span ${labelStyle}>BOOTH手数料</span><span ${valueStyle}>-¥${Math.floor(Math.abs(latestMonth.boothFee)).toLocaleString()}</span></div>
+                            <div ${rowStyle}><span ${labelStyle}>手数料差し引き後</span><span ${valueStyle}>¥${Math.floor(latestMonth.total).toLocaleString()}</span></div>
+                            <div ${dividerStyle}></div>
+                            <div ${rowStyle}><span ${labelStyle}>総販売件数</span><span ${valueStyle}>${latestMonth.count}件</span></div>
+                            <div ${rowStyle}><span ${labelStyle}>振込手数料</span><span ${valueStyle}>-¥${Math.floor(transferFee).toLocaleString()}</span></div>
+                            <div ${dividerStyle}></div>
+                            <div ${rowStyle}><span ${labelStyle}>受取金額</span><span style="font-weight:700; font-size:1.05em;">¥${Math.floor(latestMonth.netTotal).toLocaleString()}</span></div>
+                            <button onclick="downloadMonthCSV('${latestMonth.month}', 0)" ${cardStyle}>集計結果を保存</button>
                         </div>
                     </div>
                 </div>
+            </div>
             `;
 
             // 過去の月（新しい順）
             for (let i = monthsInfo.length - 2; i >= 0; i--) {
                 const m = monthsInfo[i];
                 html += `
-                    <div class="month-summary-item" onclick="toggleMonthDetails('month_${m.month}')">
-                        <div class="month-summary-header">
-                            <div><span class="month-summary-title">${m.month}</span></div>
-                            <div class="month-summary-amount">¥${Math.floor(m.netTotal).toLocaleString()}</div>
-                        </div>
-                        <div class="month-details" id="month_${m.month}">
-                            <div class="month-details-grid">
-                                <div class="month-detail-item"><span class="month-detail-label">ぽぽ（手数料前）</span><span class="month-detail-value">¥${Math.floor(m.popoSub).toLocaleString()}</span></div>
-                                <div class="month-detail-item"><span class="month-detail-label">ぽぽ（手数料後）</span><span class="month-detail-value">¥${Math.floor(m.popo).toLocaleString()}</span></div>
-                                <div class="month-detail-item"><span class="month-detail-label">ぽぽ受取</span><span class="month-detail-value" style="font-weight:700; color:#73C2FB;">¥${Math.floor(m.net1).toLocaleString()}</span></div>
-                                <div class="month-detail-item"><span class="month-detail-label">ぽ（手数料前）</span><span class="month-detail-value">¥${Math.floor(m.poSub).toLocaleString()}</span></div>
-                                <div class="month-detail-item"><span class="month-detail-label">ぽ（手数料後）</span><span class="month-detail-value">¥${Math.floor(m.po).toLocaleString()}</span></div>
-                                <div class="month-detail-item"><span class="month-detail-label">ぽ受取</span><span class="month-detail-value" style="font-weight:700; color:#ADE0EE;">¥${Math.floor(m.net2).toLocaleString()}</span></div>
-                                <div class="month-detail-item"><span class="month-detail-label">売上合計（手数料前）</span><span class="month-detail-value">¥${m.subtotal.toLocaleString()}</span></div>
-                                <div class="month-detail-item"><span class="month-detail-label">BOOTH手数料</span><span class="month-detail-value">-¥${Math.abs(m.boothFee).toLocaleString()}</span></div>
-                                <div class="month-detail-item"><span class="month-detail-label">手数料差引後</span><span class="month-detail-value">¥${m.total.toLocaleString()}</span></div>
-                                <div class="month-detail-item"><span class="month-detail-label">振込手数料</span><span class="month-detail-value">-¥${Math.floor(transferFee).toLocaleString()}</span></div>
-                                <div class="month-detail-item"><span class="month-detail-label">売上割合</span><span class="month-detail-value">ぽぽ ${(m.ratio1 * 100).toFixed(1)}% / ぽ ${(m.ratio2 * 100).toFixed(1)}%</span></div>
-                                <div class="month-detail-item"><span class="month-detail-label">販売件数</span><span class="month-detail-value">${m.count}件</span></div>
+                    <div style="margin-bottom:20px; border:1px solid #ddd; border-radius:8px; overflow:hidden;">
+                        <div onclick="toggleMonthCard('card_${m.month}')" style="padding:15px 20px; background:#f8f9fa; cursor:pointer; display:flex; justify-content:space-between; align-items:center; transition: background 0.3s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#f8f9fa'">
+                            <div>
+                                <span style="font-size:1.3em; font-weight:700; color:#333;">${getMonthNumber(m.month)}</span>
+                                <span style="margin-left:10px; color:#999; font-size:0.9em;">(${m.month})</span>
                             </div>
-                            <div style="display:flex; gap:10px; margin-top:15px; padding-top:15px; border-top:1px solid #eee;">
-                                <button onclick="event.stopPropagation(); downloadMonthCSV('${m.month}', 1)" style="flex:1; padding:10px; background:#73C2FB; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">ぽぽのCSV保存</button>
-                                <button onclick="event.stopPropagation(); downloadMonthCSV('${m.month}', 2)" style="flex:1; padding:10px; background:#ADE0EE; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">ぽのCSV保存</button>
-                                <button onclick="event.stopPropagation(); downloadMonthCSV('${m.month}', 0)" style="flex:1; padding:10px; background:#5AB3F5; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">総合計CSV保存</button>
+                            <div style="font-size:1.1em; font-weight:600; color:#73C2FB;">
+                                ¥${Math.floor(m.netTotal).toLocaleString()}
+                                <span style="margin-left:10px; color:#999; font-size:0.8em;" id="toggle_card_${m.month}">▼</span>
+                            </div>
+                        </div>
+                        <div id="card_${m.month}" style="display:none; padding:20px;">
+                            <div class="results-grid">
+                            <div class="result-card">
+                                <h3>ぽぽ</h3>
+                                <div class="result-amount">¥${Math.floor(m.net1).toLocaleString()}</div>
+                                <div ${dividerStyle}></div>
+                                <div ${rowStyle}><span ${labelStyle}>売上合計（手数料前）</span><span ${valueStyle}>¥${Math.floor(m.popoSub).toLocaleString()}</span></div>
+                                <div ${rowStyle}><span ${labelStyle}>BOOTH手数料</span><span ${valueStyle}>-¥${Math.floor(Math.abs(m.popoSub - m.popo)).toLocaleString()}</span></div>
+                                <div ${rowStyle}><span ${labelStyle}>手数料差し引き後</span><span ${valueStyle}>¥${Math.floor(m.popo).toLocaleString()}</span></div>
+                                <div ${dividerStyle}></div>
+                                <div ${rowStyle}><span ${labelStyle}>販売件数</span><span ${valueStyle}>${m.count}件</span></div>
+                                <div ${rowStyle}><span ${labelStyle}>売上割合</span><span ${valueStyle}>${(m.ratio1 * 100).toFixed(1)}%</span></div>
+                                <div ${rowStyle}><span ${labelStyle}>振込手数料</span><span ${valueStyle}>-¥${Math.floor(m.fee1).toLocaleString()}</span></div>
+                                <div ${dividerStyle}></div>
+                                <div ${rowStyle}><span ${labelStyle}>受取金額</span><span style="font-weight:700; font-size:1.05em;">¥${Math.floor(m.net1).toLocaleString()}</span></div>
+                                <button onclick="downloadMonthCSV('${m.month}', 1)" ${cardStyle}>CSVを保存</button>
+                            </div>
+                            <div class="result-card">
+                                <h3>ぽ</h3>
+                                <div class="result-amount">¥${Math.floor(m.net2).toLocaleString()}</div>
+                                <div ${dividerStyle}></div>
+                                <div ${rowStyle}><span ${labelStyle}>売上合計（手数料前）</span><span ${valueStyle}>¥${Math.floor(m.poSub).toLocaleString()}</span></div>
+                                <div ${rowStyle}><span ${labelStyle}>BOOTH手数料</span><span ${valueStyle}>-¥${Math.floor(Math.abs(m.poSub - m.po)).toLocaleString()}</span></div>
+                                <div ${rowStyle}><span ${labelStyle}>手数料差し引き後</span><span ${valueStyle}>¥${Math.floor(m.po).toLocaleString()}</span></div>
+                                <div ${dividerStyle}></div>
+                                <div ${rowStyle}><span ${labelStyle}>販売件数</span><span ${valueStyle}>${m.count}件</span></div>
+                                <div ${rowStyle}><span ${labelStyle}>売上割合</span><span ${valueStyle}>${(m.ratio2 * 100).toFixed(1)}%</span></div>
+                                <div ${rowStyle}><span ${labelStyle}>振込手数料</span><span ${valueStyle}>-¥${Math.floor(m.fee2).toLocaleString()}</span></div>
+                                <div ${dividerStyle}></div>
+                                <div ${rowStyle}><span ${labelStyle}>受取金額</span><span style="font-weight:700; font-size:1.05em;">¥${Math.floor(m.net2).toLocaleString()}</span></div>
+                                <button onclick="downloadMonthCSV('${m.month}', 2)" ${cardStyle}>CSVを保存</button>
+                            </div>
+                            <div class="result-card">
+                                <h3>総合計</h3>
+                                <div class="result-amount">¥${Math.floor(m.netTotal).toLocaleString()}</div>
+                                <div ${dividerStyle}></div>
+                                <div ${rowStyle}><span ${labelStyle}>売上合計（手数料前）</span><span ${valueStyle}>¥${Math.floor(m.subtotal).toLocaleString()}</span></div>
+                                <div ${rowStyle}><span ${labelStyle}>BOOTH手数料</span><span ${valueStyle}>-¥${Math.floor(Math.abs(m.boothFee)).toLocaleString()}</span></div>
+                                <div ${rowStyle}><span ${labelStyle}>手数料差し引き後</span><span ${valueStyle}>¥${Math.floor(m.total).toLocaleString()}</span></div>
+                                <div ${dividerStyle}></div>
+                                <div ${rowStyle}><span ${labelStyle}>総販売件数</span><span ${valueStyle}>${m.count}件</span></div>
+                                <div ${rowStyle}><span ${labelStyle}>振込手数料</span><span ${valueStyle}>-¥${Math.floor(transferFee).toLocaleString()}</span></div>
+                                <div ${dividerStyle}></div>
+                                <div ${rowStyle}><span ${labelStyle}>受取金額</span><span style="font-weight:700; font-size:1.05em;">¥${Math.floor(m.netTotal).toLocaleString()}</span></div>
+                                <button onclick="downloadMonthCSV('${m.month}', 0)" ${cardStyle}>集計結果を保存</button>
                             </div>
                         </div>
                     </div>
+                </div>
                 `;
             }
 
@@ -1406,11 +1505,7 @@
             const totalPopoRatio = totalGrandTotal > 0 ? (totalGrandTotal - totalPo) / totalGrandTotal : 0.5;
             const totalPoRatio = totalGrandTotal > 0 ? totalPo / totalGrandTotal : 0.5;
             
-            const cardStyle = `style="margin-top: 15px; padding: 10px 20px; background: white; color: #73C2FB; border: 2px solid white; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; transition: all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.9)'" onmouseout="this.style.background='white'"`;
-            const dividerStyle = `style="border-top: 1px solid rgba(255,255,255,0.3); margin: 12px 0;"`;
-            const rowStyle = `style="display:flex; justify-content:space-between; padding: 3px 0; font-size:0.9em;"`;
-            const labelStyle = `style="opacity:0.85;"`;
-            const valueStyle = `style="font-weight:600;"`;
+            // cardStyle, dividerStyle等は既に上で宣言済み
             
             const totalSummaryHTML = `
                 <div class="result-card">
@@ -1458,13 +1553,6 @@
             
             document.getElementById('totalSummaryCards').innerHTML = totalSummaryHTML;
             document.getElementById('totalSummarySection').style.display = 'block';
-        }
-
-        function toggleMonthDetails(id) {
-            const details = document.getElementById(id);
-            if (details) {
-                details.classList.toggle('expanded');
-            }
         }
 
         // 初期化：スクリプト読み込み後に最初のファイル入力行を追加
@@ -2010,6 +2098,9 @@
             
             // CSV閲覧セクションを表示
             document.getElementById('csvViewerSection').style.display = 'block';
+            
+            // リピーター分析セクションを表示
+            document.getElementById('repeaterSection').style.display = 'block';
         }
 
         function prepareDailySales() {
@@ -2141,6 +2232,32 @@
                 btn.textContent = '表示';
             }
         }
+        
+        function toggleMonthlyData() {
+            const content = document.getElementById('monthlyComparisonContent');
+            const btn = document.getElementById('monthlyDataToggleBtn');
+            
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                btn.textContent = '隠す';
+            } else {
+                content.style.display = 'none';
+                btn.textContent = '表示';
+            }
+        }
+        
+        function toggleMonthCard(cardId) {
+            const card = document.getElementById(cardId);
+            const toggleIcon = document.getElementById('toggle_' + cardId);
+            
+            if (card.style.display === 'none') {
+                card.style.display = 'block';
+                if (toggleIcon) toggleIcon.textContent = '▲';
+            } else {
+                card.style.display = 'none';
+                if (toggleIcon) toggleIcon.textContent = '▼';
+            }
+        }
 
         function toggleCsvViewer() {
             const content = document.getElementById('csvViewerContent');
@@ -2156,6 +2273,8 @@
             }
         }
 
+        let showDetailColumns = false;
+        
         function renderCsvViewer() {
             if (csvData.length === 0) {
                 document.getElementById('csvViewerTable').innerHTML = '<tr><td style="padding:20px; text-align:center; color:#999;">読み込まれたCSVデータがありません</td></tr>';
@@ -2167,7 +2286,13 @@
             document.getElementById('csvRowCount').textContent = csvData.length.toLocaleString();
 
             // ヘッダー行を取得
-            const headers = Object.keys(csvData[0]);
+            const allHeaders = Object.keys(csvData[0]);
+            
+            // 非表示にする列
+            const detailColumns = ['商品タイプ', 'カテゴリー', 'タグ名', '品番', 'バリエーション名', 'BOOST', '公認販売手数料', '送料（自宅）', '送料（倉庫）', '送料（pixivFACTORY）', 'あんしんBOOTHパック 配送費', 'pixivFACTORY製造・配送費', 'サービス利用料', '倉庫発送手数料'];
+            
+            // 表示する列を決定
+            const headers = showDetailColumns ? allHeaders : allHeaders.filter(h => !detailColumns.includes(h));
             
             // テーブルHTML生成
             let tableHTML = '<thead style="position:sticky; top:0; background:#73C2FB; color:white; z-index:10;"><tr>';
@@ -2189,6 +2314,103 @@
 
             tableHTML += '</tbody>';
             document.getElementById('csvViewerTable').innerHTML = tableHTML;
+        }
+        
+        function toggleDetailColumns() {
+            showDetailColumns = !showDetailColumns;
+            const btn = document.getElementById('detailColumnsBtn');
+            btn.textContent = showDetailColumns ? '詳細列を隠す' : '詳細列を表示';
+            renderCsvViewer();
+        }
+        
+        function toggleRepeaterAnalysis() {
+            const content = document.getElementById('repeaterContent');
+            const btn = document.getElementById('repeaterToggleBtn');
+            
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                btn.textContent = '隠す';
+                renderRepeaterAnalysis();
+            } else {
+                content.style.display = 'none';
+                btn.textContent = '表示';
+            }
+        }
+        
+        function renderRepeaterAnalysis() {
+            if (csvData.length === 0) {
+                document.getElementById('repeaterTable').innerHTML = '<tr><td style="padding:20px; text-align:center; color:#999;">読み込まれたCSVデータがありません</td></tr>';
+                document.getElementById('repeaterCount').textContent = '0';
+                return;
+            }
+            
+            // ユーザー識別コードごとに購入回数と合計金額を集計
+            const userStats = {};
+            csvData.forEach(row => {
+                const userCode = row['ユーザー識別コード'];
+                const amount = parseFloat(row['受取金額']) || 0;
+                const productName = row['商品名'];
+                
+                if (userCode) {
+                    if (!userStats[userCode]) {
+                        userStats[userCode] = {
+                            count: 0,
+                            totalAmount: 0,
+                            products: []
+                        };
+                    }
+                    userStats[userCode].count += 1;
+                    userStats[userCode].totalAmount += amount;
+                    if (!userStats[userCode].products.includes(productName)) {
+                        userStats[userCode].products.push(productName);
+                    }
+                }
+            });
+            
+            // リピーター（2回以上）のみ抽出して購入回数順にソート
+            const repeaters = Object.keys(userStats)
+                .filter(code => userStats[code].count >= 2)
+                .map(code => ({
+                    code,
+                    count: userStats[code].count,
+                    totalAmount: userStats[code].totalAmount,
+                    products: userStats[code].products
+                }))
+                .sort((a, b) => b.count - a.count);
+            
+            document.getElementById('repeaterCount').textContent = repeaters.length.toLocaleString();
+            
+            if (repeaters.length === 0) {
+                document.getElementById('repeaterTable').innerHTML = '<tr><td style="padding:20px; text-align:center; color:#999;">リピーターがいません</td></tr>';
+                return;
+            }
+            
+            // テーブルHTML生成
+            let tableHTML = '<thead style="position:sticky; top:0; background:#73C2FB; color:white; z-index:10;"><tr>';
+            tableHTML += '<th style="padding:12px; text-align:left; border-bottom:2px solid white; font-weight:600;">順位</th>';
+            tableHTML += '<th style="padding:12px; text-align:left; border-bottom:2px solid white; font-weight:600;">ユーザー識別コード</th>';
+            tableHTML += '<th style="padding:12px; text-align:center; border-bottom:2px solid white; font-weight:600;">購入回数</th>';
+            tableHTML += '<th style="padding:12px; text-align:right; border-bottom:2px solid white; font-weight:600;">合計金額</th>';
+            tableHTML += '<th style="padding:12px; text-align:center; border-bottom:2px solid white; font-weight:600;">購入商品数</th>';
+            tableHTML += '<th style="padding:12px; text-align:left; border-bottom:2px solid white; font-weight:600;">購入商品</th>';
+            tableHTML += '</tr></thead><tbody>';
+            
+            repeaters.forEach((user, index) => {
+                const bgColor = index % 2 === 0 ? '#ffffff' : '#f8f9fa';
+                const rank = index + 1;
+                const productsList = user.products.join('、');
+                tableHTML += `<tr style="background:${bgColor};">`;
+                tableHTML += `<td style="padding:10px 12px; border-bottom:1px solid #eee; font-weight:600; color:#73C2FB;">${rank}</td>`;
+                tableHTML += `<td style="padding:10px 12px; border-bottom:1px solid #eee; font-family:monospace;">${user.code}</td>`;
+                tableHTML += `<td style="padding:10px 12px; border-bottom:1px solid #eee; text-align:center; font-weight:600;">${user.count}回</td>`;
+                tableHTML += `<td style="padding:10px 12px; border-bottom:1px solid #eee; text-align:right;">¥${Math.floor(user.totalAmount).toLocaleString()}</td>`;
+                tableHTML += `<td style="padding:10px 12px; border-bottom:1px solid #eee; text-align:center;">${user.products.length}種類</td>`;
+                tableHTML += `<td style="padding:10px 12px; border-bottom:1px solid #eee; font-size:0.85em; max-width:400px; white-space:normal;">${productsList}</td>`;
+                tableHTML += '</tr>';
+            });
+            
+            tableHTML += '</tbody>';
+            document.getElementById('repeaterTable').innerHTML = tableHTML;
         }
 
         function downloadResultsSummary() {
