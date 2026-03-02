@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>売上集計ツール</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -306,6 +307,12 @@
         
         .group-btn.active {
             background: #73C2FB;
+            color: white;
+            border-color: #73C2FB;
+        }
+        
+        .group-btn.divided {
+            background: linear-gradient(135deg, #73C2FB 50%, #ADE0EE 50%);
             color: white;
             border-color: #73C2FB;
         }
@@ -881,6 +888,54 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        /* モーダルダイアログ */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #73C2FB;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+        }
+        
+        .modal-close:hover {
+            color: #333;
+        }
     </style>
 </head>
 <body>
@@ -908,6 +963,7 @@
                 <button class="btn-primary" onclick="addFileInput()" style="padding: 10px 25px; font-size: 0.95em;">CSVファイルを追加</button>
                 <button class="btn-secondary" onclick="document.getElementById('unifiedFileInput').click()" style="padding: 10px 25px; font-size: 0.95em;">統合CSVを読み込む</button>
                 <input type="file" id="unifiedFileInput" accept=".csv" style="display:none;" onchange="loadUnifiedData(this)">
+                <button onclick="clearAllData()" style="padding: 10px 25px; font-size: 0.95em; background:#ff4444; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">全てクリア</button>
             </div>
             <div id="settingsLoadedMsg" style="display:none; margin-top:10px; color:#73C2FB; font-weight:600; font-size:0.9em;">データを読み込みました</div>
         </div>
@@ -926,6 +982,16 @@
                        style="padding: 10px 20px; border: 2px solid #73C2FB; border-radius: 6px; font-size: 1em; width: 150px; text-align: right;">
                 <span style="margin-left: 5px; color: #666;">円</span>
             </div>
+            
+            <!-- 請求書設定（非表示・値は保存用） -->
+            <div id="invoiceSettings" style="display:none;">
+                <input type="hidden" id="invoiceRecipient" value="">
+                <input type="hidden" id="invoiceIssuer" value="">
+                <input type="hidden" id="invoiceAddress" value="">
+                <input type="hidden" id="invoiceBank" value="">
+                <input type="hidden" id="invoiceDueDate" value="">
+            </div>
+            
             <div class="button-row">
                 <button class="btn-primary" onclick="calculateResults()">集計実行</button>
                 <button class="btn-secondary" onclick="saveUnifiedData()">統合CSVを保存</button>
@@ -939,7 +1005,20 @@
         </div>
         
         <div class="results" id="results">
-            <h2>集計結果</h2>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h2 style="margin:0;">集計結果</h2>
+                <div id="shopFilterResults" style="display:inline-flex; gap:10px;">
+                    <button data-filter="all" onclick="setShopFilterResults('all');" style="padding:8px 16px; border-radius:6px; border:2px solid #73C2FB; background:#73C2FB; color:white; font-weight:600; cursor:pointer; font-size:0.9em;">
+                        全て
+                    </button>
+                    <button data-filter="shop1" onclick="setShopFilterResults('shop1');" style="padding:8px 16px; border-radius:6px; border:2px solid #73C2FB; background:white; color:#73C2FB; font-weight:600; cursor:pointer; font-size:0.9em;">
+                        ショップ1
+                    </button>
+                    <button data-filter="shop2" onclick="setShopFilterResults('shop2');" style="padding:8px 16px; border-radius:6px; border:2px solid #73C2FB; background:white; color:#73C2FB; font-weight:600; cursor:pointer; font-size:0.9em;">
+                        ショップ2
+                    </button>
+                </div>
+            </div>
             
             <div class="results-grid" id="summaryCards"></div>
             
@@ -947,7 +1026,20 @@
             <div id="dailySalesSection" style="display:none; margin-top:30px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                     <h3 style="color:#333; margin:0;">日別売上</h3>
-                    <button class="expand-btn" onclick="toggleDailySales()" id="dailySalesToggleBtn">表示</button>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <div id="shopFilterDaily" style="display:inline-flex; gap:8px;">
+                            <button data-filter="all" onclick="setShopFilterDaily('all');" style="padding:6px 12px; border-radius:6px; border:2px solid #73C2FB; background:#73C2FB; color:white; font-weight:600; cursor:pointer; font-size:0.85em;">
+                                全て
+                            </button>
+                            <button data-filter="shop1" onclick="setShopFilterDaily('shop1');" style="padding:6px 12px; border-radius:6px; border:2px solid #73C2FB; background:white; color:#73C2FB; font-weight:600; cursor:pointer; font-size:0.85em;">
+                                ショップ1
+                            </button>
+                            <button data-filter="shop2" onclick="setShopFilterDaily('shop2');" style="padding:6px 12px; border-radius:6px; border:2px solid #73C2FB; background:white; color:#73C2FB; font-weight:600; cursor:pointer; font-size:0.85em;">
+                                ショップ2
+                            </button>
+                        </div>
+                        <button class="expand-btn" onclick="toggleDailySales()" id="dailySalesToggleBtn">表示</button>
+                    </div>
                 </div>
                 <div id="dailySalesContent" style="display:none;"></div>
             </div>
@@ -956,18 +1048,58 @@
             <div class="monthly-comparison" id="monthlyComparison" style="display:none; margin-top:30px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                     <h3 style="color:#333; margin:0;">月別データ</h3>
-                    <button class="expand-btn" onclick="toggleMonthlyData()" id="monthlyDataToggleBtn">表示</button>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <div id="shopFilterMonthly" style="display:inline-flex; gap:8px;">
+                            <button data-filter="all" onclick="setShopFilterMonthly('all');" style="padding:6px 12px; border-radius:6px; border:2px solid #73C2FB; background:#73C2FB; color:white; font-weight:600; cursor:pointer; font-size:0.85em;">
+                                全て
+                            </button>
+                            <button data-filter="shop1" onclick="setShopFilterMonthly('shop1');" style="padding:6px 12px; border-radius:6px; border:2px solid #73C2FB; background:white; color:#73C2FB; font-weight:600; cursor:pointer; font-size:0.85em;">
+                                ショップ1
+                            </button>
+                            <button data-filter="shop2" onclick="setShopFilterMonthly('shop2');" style="padding:6px 12px; border-radius:6px; border:2px solid #73C2FB; background:white; color:#73C2FB; font-weight:600; cursor:pointer; font-size:0.85em;">
+                                ショップ2
+                            </button>
+                        </div>
+                        <button class="expand-btn" onclick="toggleMonthlyData()" id="monthlyDataToggleBtn">表示</button>
+                    </div>
                 </div>
                 <div id="monthlyComparisonContent" style="display:none;"></div>
             </div>
             
             <!-- 通算合算 -->
             <div id="totalSummarySection" style="display:none; margin-top:30px;">
-                <h3 style="color:#333; margin-bottom:15px;">通算合算</h3>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <h3 style="color:#333; margin:0;">通算合算</h3>
+                    <div id="shopFilterTotal" style="display:inline-flex; gap:8px;">
+                        <button data-filter="all" onclick="setShopFilterMonthly('all');" style="padding:6px 12px; border-radius:6px; border:2px solid #73C2FB; background:#73C2FB; color:white; font-weight:600; cursor:pointer; font-size:0.85em;">
+                            全て
+                        </button>
+                        <button data-filter="shop1" onclick="setShopFilterMonthly('shop1');" style="padding:6px 12px; border-radius:6px; border:2px solid #73C2FB; background:white; color:#73C2FB; font-weight:600; cursor:pointer; font-size:0.85em;">
+                            ショップ1
+                        </button>
+                        <button data-filter="shop2" onclick="setShopFilterMonthly('shop2');" style="padding:6px 12px; border-radius:6px; border:2px solid #73C2FB; background:white; color:#73C2FB; font-weight:600; cursor:pointer; font-size:0.85em;">
+                            ショップ2
+                        </button>
+                    </div>
+                </div>
                 <div class="results-grid" id="totalSummaryCards"></div>
             </div>
             
-            <table id="detailsTable"></table>
+            <!-- アイテムごとの売上 -->
+            <div id="detailsTableSection" style="display:none; margin-top:30px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <h3 style="color:#333; margin:0;">アイテムごとの売上</h3>
+                    <div style="display:inline-flex; gap:8px;">
+                        <button onclick="sortDetailsTable('amount')" id="sortByAmount" style="padding:6px 12px; border-radius:6px; border:2px solid #73C2FB; background:#73C2FB; color:white; font-weight:600; cursor:pointer; font-size:0.85em;">
+                            売上順
+                        </button>
+                        <button onclick="sortDetailsTable('count')" id="sortByCount" style="padding:6px 12px; border-radius:6px; border:2px solid #73C2FB; background:white; color:#73C2FB; font-weight:600; cursor:pointer; font-size:0.85em;">
+                            販売数順
+                        </button>
+                    </div>
+                </div>
+                <table id="detailsTable"></table>
+            </div>
         </div>
         
         <!-- CSV閲覧セクション -->
@@ -1061,15 +1193,24 @@
 
     <script>
         let csvData = [];
-        let productGroups = {};
-        let productRatios = {};
+        let productGroups = {}; // 商品名ベース（後方互換用）
+        let productRatios = {}; // 商品名ベース（後方互換用）
+        let productIdGroups = {}; // 商品IDベースのグループ設定
+        let productIdRatios = {}; // 商品IDベースの分配割合
+        let productIdRatioEnabled = {}; // 商品IDベースの分配割合有効/無効状態
+        let variationRatios = {}; // バリエーション別の分配割合 {productId_variation: ratio}
+        let productIdToName = {}; // 商品ID → 最新の商品名
+        let productIdToVariations = {}; // 商品ID → バリエーションリスト
+        let fileShops = {}; // ファイルID → ショップ番号 (1 or 2)
+        let shopFilterResults = 'all'; // 集計結果のフィルター
+        let shopFilterMonthly = 'all'; // 月別データのフィルター
+        let shopFilterDaily = 'all'; // 日別売上のフィルター
         let results = [];
         let rawDataMap = {};
         let fileCounter = 0;
         let fileNames = [];
         let originalFileName = '';
         let presetProducts = {};
-        let productIdToName = {};
 
         // ====== グループ設定の保存・読み込み ======
         function saveUnifiedData() {
@@ -1082,8 +1223,8 @@
                 return;
             }
             
-            const originalHeaders = Object.keys(csvData[0]);
-            const settingHeaders = ['設定_グループ', '設定_分配割合', '設定_分配有効'];
+            const originalHeaders = Object.keys(csvData[0]).filter(h => h !== '_shop');
+            const settingHeaders = ['設定_グループ', '設定_分配割合', '設定_分配有効', '設定_ショップ'];
             const allHeaders = [...originalHeaders, ...settingHeaders];
             
             // ヘッダー行
@@ -1092,11 +1233,29 @@
             // データ行
             csvData.forEach(row => {
                 const productName = row['商品名'];
-                const group = productGroups[productName] || 1;
-                const safeId = productName.replace(/[^a-zA-Z0-9]/g, '_');
+                const productId = row['商品ID'];
+                const variation = row['バリエーション名'] || '';
+                
+                // 商品IDベースでグループと割合を取得（後方互換性あり）
+                let group = productIdGroups[productId];
+                if (group === undefined) {
+                    group = productGroups[productName] || 1;
+                }
+                
+                const safeId = `pid_${productId}`;
                 const ratioEl = document.getElementById(`ratio_${safeId}`);
                 const isRatioEnabled = ratioEl && ratioEl.classList.contains('active');
-                const ratio = productRatios[productName] || 50;
+                
+                // バリエーション別設定をチェック
+                const varKey = `${productId}_${variation}`;
+                let ratio;
+                if (variationRatios[varKey] !== undefined) {
+                    ratio = variationRatios[varKey];
+                } else if (productIdRatios[productId] !== undefined) {
+                    ratio = productIdRatios[productId];
+                } else {
+                    ratio = productRatios[productName] || 50;
+                }
                 
                 // 元のデータ（全列）
                 const rowData = originalHeaders.map(header => {
@@ -1112,8 +1271,9 @@
                 const settingGroup = group === 1 ? 'ぽぽ' : 'ぽ';
                 const settingRatio = ratio;
                 const settingEnabled = isRatioEnabled ? '有効' : '無効';
+                const settingShop = row['_shop'] || 1;
                 
-                csv += rowData.join(',') + `,${settingGroup},${settingRatio},${settingEnabled}\n`;
+                csv += rowData.join(',') + `,${settingGroup},${settingRatio},${settingEnabled},${settingShop}\n`;
             });
             
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -1143,12 +1303,35 @@
                     if (hasSettings) {
                         // 統合CSVファイル
                         // 既存のcsvDataと統合（重複チェック）
-                        const seenOrderNumbers = new Set();
                         
-                        // 既存データの注文番号を記録
+                        // 注文番号ごとに日付をマッピング
+                        const orderDates = {};
+                        rows.forEach(row => {
+                            const orderNumber = row['注文番号'];
+                            const date = row['注文日時'];
+                            if (orderNumber && date && !orderDates[orderNumber]) {
+                                orderDates[orderNumber] = date;
+                            }
+                        });
+                        
+                        // 日付なし行に日付を補完
+                        rows.forEach(row => {
+                            const orderNumber = row['注文番号'];
+                            if (orderNumber && !row['注文日時'] && orderDates[orderNumber]) {
+                                row['注文日時'] = orderDates[orderNumber];
+                            }
+                        });
+                        
+                        // 按分計算はrebuildCsvDataで行うため、ここでは不要
+                        
+                        // 既存データのキーを記録
+                        const seenKeys = new Set();
                         csvData.forEach(row => {
                             const orderNumber = row['注文番号'];
-                            if (orderNumber) seenOrderNumbers.add(orderNumber);
+                            const productId = row['商品ID'];
+                            const variation = row['バリエーション名'] || '';
+                            const key = `${orderNumber}|||${productId}|||${variation}`;
+                            seenKeys.add(key);
                         });
                         
                         // 新しく読み込むデータ
@@ -1157,11 +1340,17 @@
                         rows.forEach(row => {
                             const orderNumber = row['注文番号'];
                             const productName = row['商品名'];
+                            const productId = row['商品ID'];
+                            const variation = row['バリエーション名'] || '';
                             const settingGroup = row['設定_グループ'];
                             const settingRatio = parseInt(row['設定_分配割合']) || 50;
                             const settingEnabled = row['設定_分配有効'] === '有効';
+                            const settingShop = parseInt(row['設定_ショップ']) || 1;
                             
-                            // 設定を復元（最初の行のみ）
+                            // ショップ情報を行に付与
+                            row['_shop'] = settingShop;
+                            
+                            // 設定を復元（商品名ベース - 後方互換性）
                             if (productName && !presetProducts[productName]) {
                                 const group = settingGroup === 'ぽぽ' ? 1 : 2;
                                 presetProducts[productName] = {
@@ -1173,32 +1362,42 @@
                                 productRatios[productName] = settingRatio;
                             }
                             
-                            // 重複チェック
-                            if (orderNumber) {
-                                if (!seenOrderNumbers.has(orderNumber)) {
-                                    seenOrderNumbers.add(orderNumber);
-                                    // 設定列を除外してCSVデータに追加
-                                    const cleanRow = {...row};
-                                    delete cleanRow['設定_グループ'];
-                                    delete cleanRow['設定_分配割合'];
-                                    delete cleanRow['設定_分配有効'];
-                                    newRows.push(cleanRow);
-                                }
-                            } else {
-                                // 注文番号がない場合はそのまま追加
+                            // 商品IDベースでも設定を保存
+                            if (productId) {
+                                const group = settingGroup === 'ぽぽ' ? 1 : 2;
+                                productIdGroups[productId] = group;
+                                productIdRatios[productId] = settingRatio;
+                                productIdRatioEnabled[productId] = settingEnabled;
+                            }
+                            
+                            // 重複チェック（注文番号+商品ID+バリエーションで判定）
+                            const key = `${orderNumber}|||${productId}|||${variation}`;
+                            if (!seenKeys.has(key)) {
+                                seenKeys.add(key);
+                                // 設定列を除外してCSVデータに追加
                                 const cleanRow = {...row};
                                 delete cleanRow['設定_グループ'];
                                 delete cleanRow['設定_分配割合'];
                                 delete cleanRow['設定_分配有効'];
+                                delete cleanRow['設定_ショップ'];
                                 newRows.push(cleanRow);
                             }
                         });
                         
-                        // csvDataに追加（置き換えではなく追加）
-                        csvData = csvData.concat(newRows);
-                        
                         // 統合CSVのファイル名を記録
                         originalFileName = file.name.replace('.csv', '').replace('booth_unified_', '');
+                        
+                        // 統合CSVもrawDataMapに保存（通常CSVと統合するため）
+                        // 統合CSVは各行に_shopが設定されているので、ファイル全体のshopはnull
+                        const unifiedId = 'unified_' + Date.now();
+                        rawDataMap[unifiedId] = {
+                            name: originalFileName,
+                            rows: newRows,
+                            shop: null  // 統合CSVは各行に_shopがあるのでnull
+                        };
+                        
+                        // rebuildCsvDataを呼んで全データを統合
+                        rebuildCsvData();
                         
                         const duplicateCount = rows.length - newRows.length;
                         let message = `統合CSVを読み込みました（${Object.keys(presetProducts).length}商品の設定、${newRows.length}件の新規データ）`;
@@ -1210,9 +1409,7 @@
                         document.getElementById('settingsLoadedMsg').style.display = 'block';
                         setTimeout(() => document.getElementById('settingsLoadedMsg').style.display = 'none', 4000);
                         
-                        // 商品リスト表示
-                        const uniqueProducts = new Set(csvData.map(r => r['商品名']));
-                        displayProductList(Array.from(uniqueProducts));
+                        // rebuildCsvDataがdisplayProductListを呼ぶので、ここでは不要
                         
                     } else {
                         // 通常のBOOTH CSVファイル
@@ -1250,24 +1447,44 @@
 
             // CSVから全ての月を集計
             const allMonthData = {};
-            csvData.forEach(row => {
+            const filteredData = filterDataByShop(csvData, 'monthly');
+            filteredData.forEach(row => {
                 const productName = row['商品名'];
+                const productId = row['商品ID'];
+                const variation = row['バリエーション名'] || '';
                 const amount = parseFloat(row['受取金額']) || 0;
                 const subtotal = parseFloat(row['小計']) || 0;
+                const quantity = parseInt(row['数量']) || 1;
                 
                 const rawDate = (row['注文日時'] || '').split(' ')[0];
                 if (!rawDate) return;
                 const dateStr = rawDate.replace(/\//g, '-');
                 const monthStr = dateStr.substring(0, 7);
 
-                const selectedGroup = productGroups[productName] || 1;
-                const safeId = productName.replace(/[^a-zA-Z0-9]/g, '_');
-                const ratioEl = document.getElementById(`ratio_${safeId}`);
-                const isRatioEnabled = ratioEl && ratioEl.classList.contains('active');
+                // 商品IDベースでグループを取得
+                let selectedGroup = productIdGroups[productId];
+                if (selectedGroup === undefined) {
+                    selectedGroup = productGroups[productName] || 1;
+                }
+                
+                // 利益分配が有効かどうかを判定
+                const isRatioEnabled = productIdRatioEnabled[productId] === true;
+                
+                // バリエーション別設定をチェック
+                const varKey = `${productId}_${variation}`;
+                const hasVariationRatio = variationRatios[varKey] !== undefined;
 
                 let popoAmt = 0, poAmt = 0, popoSub = 0, poSub = 0;
-                if (isRatioEnabled) {
-                    const ratio = productRatios[productName] || 50;
+                if (isRatioEnabled || hasVariationRatio) {
+                    let ratio;
+                    if (hasVariationRatio) {
+                        ratio = variationRatios[varKey];
+                    } else if (productIdRatios[productId] !== undefined) {
+                        ratio = productIdRatios[productId];
+                    } else {
+                        ratio = productRatios[productName] || 50;
+                    }
+                    
                     // 端数をぽぽに寄せる：ぽを先に計算し、残りをぽぽに
                     poAmt = Math.floor(amount * ((100 - ratio) / 100));
                     popoAmt = amount - poAmt;
@@ -1288,7 +1505,7 @@
                 allMonthData[monthStr].po += poAmt;
                 allMonthData[monthStr].popoSub += popoSub;
                 allMonthData[monthStr].poSub += poSub;
-                allMonthData[monthStr].count += 1;
+                allMonthData[monthStr].count += quantity;
             });
 
             const allMonths = Object.keys(allMonthData).sort();
@@ -1308,9 +1525,9 @@
                 const boothFee = sub - total;
                 const ratio1 = total > 0 ? popo / total : 0.5;
                 const ratio2 = total > 0 ? po / total : 0.5;
-                // 振込手数料を分配（端数はぽぽに寄せる）
-                const fee2 = Math.floor(transferFee * ratio2);
-                const fee1 = transferFee - fee2;
+                // 振込手数料はぽぽが全額負担
+                const fee1 = transferFee;
+                const fee2 = 0;
                 const net1 = popo - fee1;
                 const net2 = po - fee2;
                 const netTotal = net1 + net2;
@@ -1326,15 +1543,15 @@
             });
             
             // 全ての月を時系列順に並べる
-            const monthsInfo = Object.keys(allMonthsMap).sort().map(m => allMonthsMap[m]);
+            const monthsInfo = Object.keys(allMonthsMap).sort().reverse().map(m => allMonthsMap[m]);
             
             if (monthsInfo.length === 0) {
                 document.getElementById('monthlyComparison').style.display = 'none';
                 return;
             }
 
-            const latestMonth = monthsInfo[monthsInfo.length - 1];
-            const prevMonth = monthsInfo.length > 1 ? monthsInfo[monthsInfo.length - 2] : null;
+            const latestMonth = monthsInfo[0]; // reverseしたので最初が最新月
+            const prevMonth = monthsInfo.length > 1 ? monthsInfo[1] : null; // 2番目が先月
 
             let html = '';
 
@@ -1395,10 +1612,10 @@
                             <div ${dividerStyle}></div>
                             <div ${rowStyle}><span ${labelStyle}>販売件数</span><span ${valueStyle}>${latestMonth.count}件</span></div>
                             <div ${rowStyle}><span ${labelStyle}>売上割合</span><span ${valueStyle}>${(latestMonth.ratio2 * 100).toFixed(1)}%</span></div>
-                            <div ${rowStyle}><span ${labelStyle}>振込手数料</span><span ${valueStyle}>-¥${Math.floor(latestMonth.fee2).toLocaleString()}</span></div>
                             <div ${dividerStyle}></div>
                             <div ${rowStyle}><span ${labelStyle}>受取金額</span><span style="font-weight:700; font-size:1.05em;">¥${Math.floor(latestMonth.net2).toLocaleString()}</span></div>
                             <button onclick="downloadMonthCSV('${latestMonth.month}', 2)" ${cardStyle}>CSVを保存</button>
+                            <button onclick="generateInvoice('${latestMonth.month}', 2)" style="margin-top: 10px; padding: 10px 20px; background: #ADE0EE; color: white; border: 2px solid white; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%;">請求書を生成</button>
                         </div>
                         <div class="result-card">
                             <h3>総合計</h3>
@@ -1420,7 +1637,7 @@
             `;
 
             // 過去の月（新しい順）
-            for (let i = monthsInfo.length - 2; i >= 0; i--) {
+            for (let i = 1; i < monthsInfo.length; i++) {
                 const m = monthsInfo[i];
                 html += `
                     <div style="margin-bottom:20px; border:1px solid #ddd; border-radius:8px; overflow:hidden;">
@@ -1461,10 +1678,10 @@
                                 <div ${dividerStyle}></div>
                                 <div ${rowStyle}><span ${labelStyle}>販売件数</span><span ${valueStyle}>${m.count}件</span></div>
                                 <div ${rowStyle}><span ${labelStyle}>売上割合</span><span ${valueStyle}>${(m.ratio2 * 100).toFixed(1)}%</span></div>
-                                <div ${rowStyle}><span ${labelStyle}>振込手数料</span><span ${valueStyle}>-¥${Math.floor(m.fee2).toLocaleString()}</span></div>
                                 <div ${dividerStyle}></div>
                                 <div ${rowStyle}><span ${labelStyle}>受取金額</span><span style="font-weight:700; font-size:1.05em;">¥${Math.floor(m.net2).toLocaleString()}</span></div>
                                 <button onclick="downloadMonthCSV('${m.month}', 2)" ${cardStyle}>CSVを保存</button>
+                                <button onclick="generateInvoice('${m.month}', 2)" style="margin-top: 10px; padding: 10px 20px; background: #ADE0EE; color: white; border: 2px solid white; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%;">請求書を生成</button>
                             </div>
                             <div class="result-card">
                                 <h3>総合計</h3>
@@ -1532,7 +1749,6 @@
                     <div ${dividerStyle}></div>
                     <div ${rowStyle}><span ${labelStyle}>販売件数</span><span ${valueStyle}>${totalCount}件</span></div>
                     <div ${rowStyle}><span ${labelStyle}>売上割合</span><span ${valueStyle}>${(totalPoRatio * 100).toFixed(1)}%</span></div>
-                    <div ${rowStyle}><span ${labelStyle}>振込手数料累計</span><span ${valueStyle}>-¥${Math.floor(monthsInfo.reduce((s, m) => s + m.fee2, 0)).toLocaleString()}</span></div>
                     <div ${dividerStyle}></div>
                     <div ${rowStyle}><span ${labelStyle}>受取金額</span><span style="font-weight:700; font-size:1.05em;">¥${Math.floor(totalPo).toLocaleString()}</span></div>
                 </div>
@@ -1558,6 +1774,44 @@
         // 初期化：スクリプト読み込み後に最初のファイル入力行を追加
         document.addEventListener('DOMContentLoaded', () => { addFileInput(); });
 
+        function clearAllData() {
+            if (!confirm('全てのデータをクリアしますか？')) {
+                return;
+            }
+            
+            // 全てのファイル入力を削除
+            document.getElementById('fileInputList').innerHTML = '';
+            
+            // データをクリア
+            rawDataMap = {};
+            csvData = [];
+            fileNames = [];
+            results = [];
+            fileShops = {};
+            productGroups = {};
+            productRatios = {};
+            productIdGroups = {};
+            productIdRatios = {};
+            productIdRatioEnabled = {};
+            variationRatios = {};
+            productIdToName = {};
+            productIdToVariations = {};
+            presetProducts = {};
+            fileCounter = 0;
+            
+            // UIをクリア
+            document.getElementById('productList').innerHTML = '';
+            document.getElementById('groupAssignment').style.display = 'none';
+            document.getElementById('actionButtons').style.display = 'none';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('csvViewerSection').style.display = 'none';
+            document.getElementById('repeaterSection').style.display = 'none';
+            document.getElementById('chartSection').style.display = 'none';
+            
+            // 最初のファイル入力を追加
+            addFileInput();
+        }
+        
         function addFileInput() {
             fileCounter++;
             const id = fileCounter;
@@ -1571,6 +1825,10 @@
                 <input type="file" id="csvInput_${id}" accept=".csv" style="display:none;">
                 <label for="csvInput_${id}" class="file-label-small">ファイル ${id} を選択</label>
                 <span class="file-name-inline" id="fileNameLabel_${id}">選択されていません</span>
+                <select id="shopSelect_${id}" style="margin-left:10px; padding:5px; border-radius:4px; border:1px solid #ddd;">
+                    <option value="1">ショップ1</option>
+                    <option value="2">ショップ2</option>
+                </select>
                 <button class="remove-btn" onclick="removeFileInput(${id})" title="削除">&times;</button>
             `;
 
@@ -1582,8 +1840,138 @@
                 document.getElementById(`fileNameLabel_${id}`).textContent = file.name;
                 readFileIntoMap(file, id);
             });
+            
+            // ショップ選択の変更イベント
+            document.getElementById(`shopSelect_${id}`).addEventListener('change', function(e) {
+                if (rawDataMap[id]) {
+                    const shopNumber = parseInt(e.target.value);
+                    rawDataMap[id].shop = shopNumber;
+                    fileShops[id] = shopNumber;
+                    rebuildCsvData();
+                }
+            });
         }
 
+        function setShopFilterResults(filter) {
+            shopFilterResults = filter;
+            displayResults();
+            updateShopFilterButtons('shopFilterResults', filter);
+        }
+        
+        function setShopFilterMonthly(filter) {
+            shopFilterMonthly = filter;
+            displayMonthlyComparison();
+            updateShopFilterButtons('shopFilterMonthly', filter);
+            updateShopFilterButtons('shopFilterTotal', filter);
+        }
+        
+        function setShopFilterDaily(filter) {
+            shopFilterDaily = filter;
+            prepareDailySales();
+            updateShopFilterButtons('shopFilterDaily', filter);
+        }
+        
+        function updateShopFilterButtons(containerId, currentFilter) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            
+            const buttons = container.querySelectorAll('button[data-filter]');
+            buttons.forEach(btn => {
+                const filter = btn.getAttribute('data-filter');
+                if (filter === currentFilter) {
+                    btn.style.background = '#73C2FB';
+                    btn.style.color = 'white';
+                } else {
+                    btn.style.background = 'white';
+                    btn.style.color = '#73C2FB';
+                }
+            });
+        }
+        
+        let currentSortBy = 'amount'; // 'amount' or 'count'
+        
+        function sortDetailsTable(sortBy) {
+            currentSortBy = sortBy;
+            
+            // ボタンのスタイルを更新
+            const amountBtn = document.getElementById('sortByAmount');
+            const countBtn = document.getElementById('sortByCount');
+            
+            if (sortBy === 'amount') {
+                amountBtn.style.background = '#73C2FB';
+                amountBtn.style.color = 'white';
+                countBtn.style.background = 'white';
+                countBtn.style.color = '#73C2FB';
+            } else {
+                amountBtn.style.background = 'white';
+                amountBtn.style.color = '#73C2FB';
+                countBtn.style.background = '#73C2FB';
+                countBtn.style.color = 'white';
+            }
+            
+            // テーブルを再描画
+            renderDetailsTable();
+        }
+        
+        function renderDetailsTable() {
+            // resultsをソート
+            let sortedResults = [...results];
+            if (currentSortBy === 'amount') {
+                sortedResults.sort((a, b) => b.amount - a.amount);
+            } else {
+                sortedResults.sort((a, b) => b.count - a.count);
+            }
+            
+            // 詳細テーブルHTML生成
+            let tableHTML = `
+                <thead>
+                    <tr>
+                        <th>グループ</th>
+                        <th>商品名</th>
+                        <th>分配割合</th>
+                        <th>販売数</th>
+                        <th>受取金額合計</th>
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+            
+            sortedResults.forEach(result => {
+                const ratioText = result.isDivided ? `${result.ratio}%` : '100%';
+                const displayName = result.variation ? `${result.product} (${result.variation})` : result.product;
+                tableHTML += `
+                    <tr>
+                        <td>${result.group === 1 ? 'ぽぽ' : 'ぽ'}</td>
+                        <td class="clickable-product" onclick="showProductDetail('${result.product.replace(/'/g, "\\'")}', ${result.group})">${displayName}</td>
+                        <td>${ratioText}</td>
+                        <td>${result.count}件</td>
+                        <td class="amount-cell">¥${Math.floor(result.amount).toLocaleString()}</td>
+                    </tr>
+                `;
+            });
+            
+            tableHTML += '</tbody>';
+            document.getElementById('detailsTable').innerHTML = tableHTML;
+            document.getElementById('detailsTableSection').style.display = 'block';
+        }
+        
+        function filterDataByShop(data, filterType) {
+            let filter;
+            if (filterType === 'results') filter = shopFilterResults;
+            else if (filterType === 'monthly') filter = shopFilterMonthly;
+            else if (filterType === 'daily') filter = shopFilterDaily;
+            
+            if (filter === 'all') return data;
+            const shopNumber = filter === 'shop1' ? 1 : 2;
+            
+            const filtered = data.filter(row => {
+                const rowShop = row['_shop'];
+                return rowShop === shopNumber;
+            });
+            
+            return filtered;
+        }
+        
         function removeFileInput(id) {
             const row = document.getElementById(`fileRow_${id}`);
             if (row) row.remove();
@@ -1594,34 +1982,128 @@
         function readFileIntoMap(file, id) {
             const reader = new FileReader();
             reader.onload = function(e) {
-                rawDataMap[id] = { name: file.name.replace('.csv', ''), rows: parseCSVToRows(e.target.result) };
+                const shopSelect = document.getElementById(`shopSelect_${id}`);
+                const shopNumber = shopSelect ? parseInt(shopSelect.value) : 1;
+                
+                rawDataMap[id] = { 
+                    name: file.name.replace('.csv', ''), 
+                    rows: parseCSVToRows(e.target.result),
+                    shop: shopNumber
+                };
+                fileShops[id] = shopNumber;
                 rebuildCsvData();
             };
             reader.readAsText(file, 'UTF-8');
         }
 
         function rebuildCsvData() {
-            const seenOrderNumbers = new Set();
             csvData = [];
             fileNames = [];
             
-            Object.values(rawDataMap).forEach(f => {
+            // まず全行を収集（ディープコピーして元データを保護）
+            const allRows = [];
+            Object.entries(rawDataMap).forEach(([fileId, f]) => {
+                const shopNumber = f.shop || 1;
+                const isUnifiedCSV = fileId.startsWith('unified_');
+                
                 f.rows.forEach(row => {
-                    const orderNumber = row['注文番号'];
-                    // 注文番号がある場合は重複チェック
-                    if (orderNumber) {
-                        if (!seenOrderNumbers.has(orderNumber)) {
-                            seenOrderNumbers.add(orderNumber);
-                            csvData.push(row);
-                        }
-                        // 重複の場合はスキップ
-                    } else {
-                        // 注文番号がない場合はそのまま追加
-                        csvData.push(row);
+                    // 元データを保護するためにコピーを作成
+                    const rowCopy = {...row};
+                    // 既に_shopが設定されている場合（統合CSVなど）はそれを使用
+                    if (!rowCopy['_shop']) {
+                        rowCopy['_shop'] = shopNumber;
                     }
+                    // 統合CSVフラグを付与
+                    rowCopy['_isUnifiedCSV'] = isUnifiedCSV;
+                    allRows.push(rowCopy);
                 });
                 fileNames.push(f.name);
             });
+            
+            // 注文番号ごとに日付をマッピング（最初の行の日付を使用）
+            const orderDates = {};
+            allRows.forEach(row => {
+                const orderNumber = row['注文番号'];
+                const date = row['注文日時'];
+                if (orderNumber && date && !orderDates[orderNumber]) {
+                    orderDates[orderNumber] = date;
+                }
+            });
+            
+            // 日付なし行に日付を補完
+            allRows.forEach(row => {
+                const orderNumber = row['注文番号'];
+                if (orderNumber && !row['注文日時'] && orderDates[orderNumber]) {
+                    row['注文日時'] = orderDates[orderNumber];
+                }
+            });
+            
+            // 重複チェック（按分計算の前に実行）
+            const seenKeys = new Set();
+            const uniqueRows = [];
+            allRows.forEach(row => {
+                const orderNumber = row['注文番号'];
+                const productId = row['商品ID'];
+                const variation = row['バリエーション名'] || '';
+                const key = `${orderNumber}|||${productId}|||${variation}`;
+                
+                if (!seenKeys.has(key)) {
+                    seenKeys.add(key);
+                    uniqueRows.push(row);
+                }
+            });
+            
+            // 注文ごとにグループ化して受取金額を按分（重複除外後のデータで）
+            const orderGroups = {};
+            uniqueRows.forEach(row => {
+                const orderNumber = row['注文番号'];
+                if (!orderGroups[orderNumber]) {
+                    orderGroups[orderNumber] = [];
+                }
+                orderGroups[orderNumber].push(row);
+            });
+            
+            // 各注文の受取金額を按分計算
+            Object.values(orderGroups).forEach(rows => {
+                if (rows.length === 1) {
+                    // 1商品のみの注文はそのまま
+                    return;
+                }
+                
+                // 全ての商品が統合CSV由来の場合のみスキップ（既に按分済み）
+                const allFromUnified = rows.every(r => r['_isUnifiedCSV']);
+                if (allFromUnified) {
+                    return;
+                }
+                
+                // 複数商品注文の場合、受取金額を按分
+                // BOOTH手数料: 5.6% + 45円/注文
+                const boothFeeRate = 0.056;
+                const boothFeeFixed = 45;
+                
+                rows.forEach((row, index) => {
+                    // 統合CSV由来のデータは既に按分済みなのでスキップ
+                    if (row['_isUnifiedCSV']) {
+                        return;
+                    }
+                    
+                    const subtotal = parseFloat(row['小計']) || 0;
+                    
+                    if (index === 0) {
+                        // 最初の商品: 小計 × (1 - 5.6%) - 45円
+                        const calculatedAmount = Math.floor(subtotal * (1 - boothFeeRate)) - boothFeeFixed;
+                        row['受取金額'] = String(calculatedAmount);
+                    } else {
+                        // 2個目以降: 小計 × (1 - 5.6%)
+                        const calculatedAmount = Math.floor(subtotal * (1 - boothFeeRate));
+                        row['受取金額'] = String(calculatedAmount);
+                    }
+                });
+            });
+            
+            // 按分計算後のデータをcsvDataに格納（既に重複除外済み）
+            csvData = uniqueRows;
+            
             originalFileName = fileNames.join('_');
 
             // 商品IDで名前を統一（最初に登場した名前を代表名にする）
@@ -1639,17 +2121,53 @@
                     row['商品名'] = productIdToName[pid];
                 }
             });
+            
+            // 商品IDとバリエーション情報を収集
+            csvData.forEach(row => {
+                const productId = row['商品ID'];
+                const productName = row['商品名'];
+                const variation = row['バリエーション名'] || '';
+                
+                if (productId) {
+                    // バリエーションリストを記録
+                    if (!productIdToVariations[productId]) {
+                        productIdToVariations[productId] = new Set();
+                    }
+                    if (variation) {
+                        productIdToVariations[productId].add(variation);
+                    }
+                }
+            });
 
             const uniqueProducts = new Set();
-            csvData.forEach(row => uniqueProducts.add(row['商品名']));
+            const uniqueProductIds = new Set();
+            csvData.forEach(row => {
+                uniqueProducts.add(row['商品名']);
+                if (row['商品ID']) {
+                    uniqueProductIds.add(row['商品ID']);
+                }
+            });
 
             // 新商品だけデフォルト設定（既存設定・preset設定は保持）
             uniqueProducts.forEach(product => {
                 if (productGroups[product] === undefined) productGroups[product] = 1;
                 if (productRatios[product] === undefined) productRatios[product] = 50;
             });
+            
+            // 商品IDベースのデフォルト設定も作成
+            uniqueProductIds.forEach(productId => {
+                if (productIdGroups[productId] === undefined) {
+                    // 商品名ベースの設定があればそれを使う
+                    const productName = productIdToName[productId];
+                    productIdGroups[productId] = productGroups[productName] || 1;
+                }
+                if (productIdRatios[productId] === undefined) {
+                    const productName = productIdToName[productId];
+                    productIdRatios[productId] = productRatios[productName] || 50;
+                }
+            });
 
-            displayProductList(Array.from(uniqueProducts));
+            displayProductList(Array.from(uniqueProductIds));
         }
 
         function parseCSVToRows(text) {
@@ -1703,44 +2221,66 @@
             return result.map(v => v.replace(/^"|"$/g, ''));
         }
 
-        function displayProductList(products) {
+        function displayProductList(productIds) {
             const productList = document.getElementById('productList');
             productList.innerHTML = '';
             
-            // 設定済みを先に、新規を後に並べる
-            const sorted = [...products].sort((a, b) => {
-                const aPreset = !!presetProducts[a];
-                const bPreset = !!presetProducts[b];
-                if (aPreset !== bPreset) return aPreset ? -1 : 1;
-                return a.localeCompare(b, 'ja');
-            });
-
-            sorted.forEach(product => {
-                const isPreset = !!presetProducts[product];
-                const ratio = productRatios[product] ?? 50;
+            // 商品IDごとに処理
+            productIds.forEach(productId => {
+                const productName = productIdToName[productId] || '不明な商品';
+                const variations = productIdToVariations[productId] ? Array.from(productIdToVariations[productId]) : [];
+                const hasVariations = variations.length > 0;
+                
+                // 商品IDベースの設定を取得（後方互換性のため商品名ベースもチェック）
+                const isPreset = !!presetProducts[productName];
+                let currentGroup = productIdGroups[productId];
+                if (currentGroup === undefined) {
+                    // 後方互換：商品名ベースの設定を移行
+                    currentGroup = productGroups[productName] || 1;
+                    productIdGroups[productId] = currentGroup;
+                }
+                
+                let ratio = productIdRatios[productId];
+                if (ratio === undefined) {
+                    // 後方互換：商品名ベースの設定を移行
+                    ratio = productRatios[productName] ?? 50;
+                    productIdRatios[productId] = ratio;
+                }
+                
                 const popoRatio = ratio;
                 const poRatio = 100 - ratio;
-                const safeId = product.replace(/[^a-zA-Z0-9]/g, '_');
-                const presetData = presetProducts[product];
-                const ratioEnabled = isPreset && presetData.ratioEnabled;
+                const safeId = `pid_${productId}`;
+                const presetData = presetProducts[productName];
+                
+                // 利益分配設定が有効かどうかを判定
+                let ratioEnabled = productIdRatioEnabled[productId];
+                if (ratioEnabled === undefined) {
+                    // 後方互換：presetProductsから判定
+                    ratioEnabled = isPreset && presetData?.ratioEnabled;
+                    if (ratioEnabled) {
+                        productIdRatioEnabled[productId] = true;
+                    }
+                }
 
                 const div = document.createElement('div');
                 div.className = `product-group-item${isPreset ? ' preset' : ''}`;
                 div.innerHTML = `
                     <div class="product-row">
                         <div class="product-name">
-                            ${product}
+                            ${productName}
                             ${isPreset ? '<span class="preset-badge">設定済み</span>' : ''}
+                            <span style="color:#999; font-size:0.85em; margin-left:8px;">ID: ${productId}</span>
                         </div>
                         <div class="group-selector">
-                            <button class="group-btn ${productGroups[product] === 1 ? 'active' : ''}" 
-                                    onclick="setGroup('${product.replace(/'/g, "\\'")}', 1)">ぽぽ</button>
-                            <button class="group-btn ${productGroups[product] === 2 ? 'active' : ''}" 
-                                    onclick="setGroup('${product.replace(/'/g, "\\'")}', 2)">ぽ</button>
+                            <button class="group-btn ${ratioEnabled ? 'divided' : (currentGroup === 1 ? 'active' : '')}" 
+                                    onclick="setGroupById('${productId}', 1)" id="btn_popo_${productId}">ぽぽ</button>
+                            <button class="group-btn ${ratioEnabled ? 'divided' : (currentGroup === 2 ? 'active' : '')}" 
+                                    onclick="setGroupById('${productId}', 2)" id="btn_po_${productId}">ぽ</button>
+                            ${hasVariations ? `<button class="group-btn" style="background:#e0e0e0; margin-left:10px;" onclick="toggleVariations('${productId}')">バリエーション</button>` : ''}
                         </div>
                     </div>
                     <label class="ratio-toggle" ${isPreset ? 'style="pointer-events:none;"' : ''}>
-                        <input type="checkbox" id="check_${safeId}" ${ratioEnabled ? 'checked' : ''} onchange="toggleRatioSlider('${safeId}')">
+                        <input type="checkbox" id="check_${safeId}" ${ratioEnabled ? 'checked' : ''} onchange="toggleRatioSlider('${safeId}', '${productId}')">
                         利益分配割合を設定する
                     </label>
                     <div class="ratio-controls ${ratioEnabled ? 'active' : ''}" id="ratio_${safeId}">
@@ -1748,13 +2288,14 @@
                         <div class="ratio-slider-container">
                             <input type="range" min="0" max="100" step="5" value="${ratio}" 
                                    class="ratio-slider" id="slider_${safeId}"
-                                   oninput="updateRatio('${product.replace(/'/g, "\\'")}', this.value)"
+                                   oninput="updateRatioById('${productId}', this.value)"
                                    style="background: linear-gradient(to right, #73C2FB 0%, #73C2FB ${ratio}%, #ADE0EE ${ratio}%, #ADE0EE 100%);">
                         </div>
                         <div class="ratio-display" id="display_${safeId}">
                             ぽぽ ${popoRatio}% : ぽ ${poRatio}%
                         </div>
                     </div>
+                    ${hasVariations ? `<div id="variations_${productId}" style="display:none; margin-top:15px; padding:15px; background:#f8f9fa; border-radius:8px;"></div>` : ''}
                 `;
                 productList.appendChild(div);
             });
@@ -1763,9 +2304,187 @@
             document.getElementById('actionButtons').style.display = 'flex';
         }
         
-        function toggleRatioSlider(safeId) {
+        function toggleRatioSlider(safeId, productId) {
             const ratioControls = document.getElementById(`ratio_${safeId}`);
             ratioControls.classList.toggle('active');
+            
+            // 状態を保存
+            const isActive = ratioControls.classList.contains('active');
+            productIdRatioEnabled[productId] = isActive;
+            
+            // ボタンのスタイルを更新
+            const popoBtn = document.getElementById(`btn_popo_${productId}`);
+            const poBtn = document.getElementById(`btn_po_${productId}`);
+            
+            if (isActive) {
+                // 利益分配設定ON：両方青く
+                if (popoBtn) {
+                    popoBtn.classList.remove('active');
+                    popoBtn.classList.add('divided');
+                }
+                if (poBtn) {
+                    poBtn.classList.remove('active');
+                    poBtn.classList.add('divided');
+                }
+            } else {
+                // 利益分配設定OFF：元のグループに戻す
+                const currentGroup = productIdGroups[productId] || 1;
+                if (popoBtn) {
+                    popoBtn.classList.remove('divided');
+                    if (currentGroup === 1) popoBtn.classList.add('active');
+                }
+                if (poBtn) {
+                    poBtn.classList.remove('divided');
+                    if (currentGroup === 2) poBtn.classList.add('active');
+                }
+            }
+        }
+        
+        function setGroupById(productId, group) {
+            productIdGroups[productId] = group;
+            // 後方互換性のため商品名ベースも更新
+            const productName = productIdToName[productId];
+            if (productName) {
+                productGroups[productName] = group;
+            }
+            
+            // ボタンのスタイルを更新（画面全体の再描画を避ける）
+            const popoBtn = document.getElementById(`btn_popo_${productId}`);
+            const poBtn = document.getElementById(`btn_po_${productId}`);
+            
+            if (popoBtn && poBtn) {
+                // 利益分配が有効かチェック
+                const safeId = `pid_${productId}`;
+                const ratioControls = document.getElementById(`ratio_${safeId}`);
+                const isDivided = ratioControls && ratioControls.classList.contains('active');
+                
+                if (!isDivided) {
+                    // 利益分配が無効な場合のみ、グループボタンを更新
+                    popoBtn.classList.toggle('active', group === 1);
+                    poBtn.classList.toggle('active', group === 2);
+                }
+            }
+        }
+        
+        function updateRatioById(productId, value) {
+            productIdRatios[productId] = parseInt(value);
+            // 後方互換性のため商品名ベースも更新
+            const productName = productIdToName[productId];
+            if (productName) {
+                productRatios[productName] = parseInt(value);
+            }
+            
+            const popoRatio = parseInt(value);
+            const poRatio = 100 - popoRatio;
+            
+            const safeId = `pid_${productId}`;
+            const display = document.getElementById(`display_${safeId}`);
+            const slider = document.getElementById(`slider_${safeId}`);
+            
+            if (display) {
+                display.textContent = `ぽぽ ${popoRatio}% : ぽ ${poRatio}%`;
+            }
+            
+            if (slider) {
+                slider.style.background = `linear-gradient(to right, #73C2FB 0%, #73C2FB ${value}%, #ADE0EE ${value}%, #ADE0EE 100%)`;
+            }
+        }
+        
+        function toggleVariations(productId) {
+            const container = document.getElementById(`variations_${productId}`);
+            if (container.style.display === 'none') {
+                // バリエーション一覧を表示
+                const variations = productIdToVariations[productId] ? Array.from(productIdToVariations[productId]) : [];
+                let html = '<h4 style="margin:0 0 10px 0; color:#333;">バリエーション別設定</h4>';
+                
+                variations.forEach(variation => {
+                    const varKey = `${productId}_${variation}`;
+                    const varRatio = variationRatios[varKey] ?? productIdRatios[productId] ?? 50;
+                    const safeVarId = varKey.replace(/[^a-zA-Z0-9]/g, '_');
+                    const popoRatio = varRatio;
+                    const poRatio = 100 - varRatio;
+                    const isVariationRatioSet = variationRatios[varKey] !== undefined;
+                    
+                    html += `
+                        <div style="margin-bottom:15px; padding:10px; background:white; border-radius:6px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                <div style="font-weight:600;">${variation}</div>
+                                <div style="display:flex; gap:5px;">
+                                    <button class="group-btn ${isVariationRatioSet ? 'divided' : ''}" style="padding:4px 12px; font-size:0.85em;" disabled>ぽぽ</button>
+                                    <button class="group-btn ${isVariationRatioSet ? 'divided' : ''}" style="padding:4px 12px; font-size:0.85em;" disabled>ぽ</button>
+                                </div>
+                            </div>
+                            <label style="display:block; margin-bottom:8px; font-size:0.9em;">
+                                <input type="checkbox" id="check_${safeVarId}" ${isVariationRatioSet ? 'checked' : ''} onchange="toggleVariationRatio('${safeVarId}', '${productId}', '${variation}')">
+                                個別の分配割合を設定
+                            </label>
+                            <div class="ratio-controls" id="ratio_${safeVarId}" style="display:${isVariationRatioSet ? 'flex' : 'none'};">
+                                <div style="min-width: 80px; font-weight: 600; color: #73C2FB;">利益分配:</div>
+                                <div class="ratio-slider-container">
+                                    <input type="range" min="0" max="100" step="5" value="${varRatio}" 
+                                           class="ratio-slider" id="slider_${safeVarId}"
+                                           oninput="updateVariationRatio('${productId}', '${variation}', this.value)"
+                                           style="background: linear-gradient(to right, #73C2FB 0%, #73C2FB ${varRatio}%, #ADE0EE ${varRatio}%, #ADE0EE 100%);">
+                                </div>
+                                <div class="ratio-display" id="display_${safeVarId}">
+                                    ぽぽ ${popoRatio}% : ぽ ${poRatio}%
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                container.innerHTML = html;
+                container.style.display = 'block';
+            } else {
+                container.style.display = 'none';
+            }
+        }
+        
+        function toggleVariationRatio(safeVarId, productId, variation) {
+            const ratioControls = document.getElementById(`ratio_${safeVarId}`);
+            const checkbox = document.getElementById(`check_${safeVarId}`);
+            const varKey = `${productId}_${variation}`;
+            
+            if (checkbox.checked) {
+                ratioControls.style.display = 'flex';
+                // variationRatiosに値を設定（まだなければデフォルト値）
+                if (variationRatios[varKey] === undefined) {
+                    variationRatios[varKey] = productIdRatios[productId] ?? 50;
+                }
+            } else {
+                ratioControls.style.display = 'none';
+                // variationRatiosから削除
+                delete variationRatios[varKey];
+            }
+            
+            // バリエーション表示を更新（再生成）
+            const container = document.getElementById(`variations_${productId}`);
+            if (container && container.style.display !== 'none') {
+                // 現在の表示状態を保持したまま再生成
+                container.style.display = 'none';
+                toggleVariations(productId); // 再度開く
+            }
+        }
+        
+        function updateVariationRatio(productId, variation, value) {
+            const varKey = `${productId}_${variation}`;
+            variationRatios[varKey] = parseInt(value);
+            
+            const popoRatio = parseInt(value);
+            const poRatio = 100 - popoRatio;
+            
+            const safeVarId = varKey.replace(/[^a-zA-Z0-9]/g, '_');
+            const display = document.getElementById(`display_${safeVarId}`);
+            const slider = document.getElementById(`slider_${safeVarId}`);
+            
+            if (display) {
+                display.textContent = `ぽぽ ${popoRatio}% : ぽ ${poRatio}%`;
+            }
+            
+            if (slider) {
+                slider.style.background = `linear-gradient(to right, #73C2FB 0%, #73C2FB ${value}%, #ADE0EE ${value}%, #ADE0EE 100%)`;
+            }
         }
         
         function updateRatio(product, value) {
@@ -1794,21 +2513,61 @@
         function calculateResults() {
             document.getElementById('loading').style.display = 'block';
             
+            // 計算前に全商品IDの設定を確認（DOM状態から最新設定を取得）
+            const uniqueProductIds = [...new Set(csvData.map(r => r['商品ID']).filter(id => id))];
+            uniqueProductIds.forEach(productId => {
+                const productName = productIdToName[productId];
+                
+                // グループ設定を確認
+                if (productIdGroups[productId] === undefined && productName) {
+                    productIdGroups[productId] = productGroups[productName] || 1;
+                }
+                
+                // 割合設定を確認
+                if (productIdRatios[productId] === undefined && productName) {
+                    productIdRatios[productId] = productRatios[productName] || 50;
+                }
+            });
+            
             setTimeout(() => {
                 const aggregation = {};
                 
-                csvData.forEach(row => {
+                // ショップフィルターを適用（集計結果用）
+                const filteredData = filterDataByShop(csvData, 'results');
+                
+                filteredData.forEach(row => {
                     const productName = row['商品名'];
+                    const productId = row['商品ID'];
+                    const variation = row['バリエーション名'] || '';
                     const amount = parseFloat(row['受取金額']) || 0;
                     const subtotal = parseFloat(row['小計']) || 0;
-                    const selectedGroup = productGroups[productName] || 1;
-                    const safeId = productName.replace(/[^a-zA-Z0-9]/g, '_');
-                    const ratioCheckbox = document.getElementById(`ratio_${safeId}`);
+                    const quantity = parseInt(row['数量']) || 1;
                     
-                    const isRatioEnabled = ratioCheckbox && ratioCheckbox.classList.contains('active');
+                    // 商品IDベースでグループを取得（後方互換性あり）
+                    let selectedGroup = productIdGroups[productId];
+                    if (selectedGroup === undefined) {
+                        selectedGroup = productGroups[productName] || 1;
+                    }
                     
-                    if (isRatioEnabled) {
-                        const ratio = productRatios[productName] || 50;
+                    // 利益分配が有効かどうかを判定（productIdRatioEnabledを使用）
+                    const isRatioEnabled = productIdRatioEnabled[productId] === true;
+                    
+                    // バリエーション別設定をチェック
+                    const varKey = `${productId}_${variation}`;
+                    const hasVariationRatio = variationRatios[varKey] !== undefined;
+                    
+                    if (isRatioEnabled || hasVariationRatio) {
+                        // バリエーション別設定がある場合はそちらを優先
+                        let ratio;
+                        if (hasVariationRatio) {
+                            ratio = variationRatios[varKey];
+                        } else {
+                            ratio = productIdRatios[productId];
+                            if (ratio === undefined) {
+                                ratio = productRatios[productName] || 50;
+                            }
+                        }
+                        
                         // 端数をぽぽに寄せる：ぽを先に計算し、残りをぽぽに
                         const poAmount = Math.floor(amount * ((100 - ratio) / 100));
                         const popoAmount = amount - poAmount;
@@ -1816,37 +2575,67 @@
                         const popoSubtotal = subtotal - poSubtotal;
                         
                         if (popoAmount > 0 || popoSubtotal > 0) {
-                            const popoKey = `${productName}|||1`;
+                            const popoKey = `${productId}|||${variation}|||1`;
                             if (!aggregation[popoKey]) {
-                                aggregation[popoKey] = { product: productName, group: 1, amount: 0, subtotal: 0, count: 0, ratio: ratio, isDivided: true };
+                                aggregation[popoKey] = { 
+                                    product: productName, 
+                                    productId: productId,
+                                    variation: variation,
+                                    group: 1, 
+                                    amount: 0, 
+                                    subtotal: 0, 
+                                    count: 0, 
+                                    ratio: ratio, 
+                                    isDivided: true 
+                                };
                             }
                             if (amount > 0 || subtotal > 0) {
                                 aggregation[popoKey].amount += popoAmount;
                                 aggregation[popoKey].subtotal += popoSubtotal;
-                                aggregation[popoKey].count += 1;
+                                aggregation[popoKey].count += quantity;
                             }
                         }
                         
                         if (poAmount > 0 || poSubtotal > 0) {
-                            const poKey = `${productName}|||2`;
+                            const poKey = `${productId}|||${variation}|||2`;
                             if (!aggregation[poKey]) {
-                                aggregation[poKey] = { product: productName, group: 2, amount: 0, subtotal: 0, count: 0, ratio: 100 - ratio, isDivided: true };
+                                aggregation[poKey] = { 
+                                    product: productName, 
+                                    productId: productId,
+                                    variation: variation,
+                                    group: 2, 
+                                    amount: 0, 
+                                    subtotal: 0, 
+                                    count: 0, 
+                                    ratio: 100 - ratio, 
+                                    isDivided: true 
+                                };
                             }
                             if (amount > 0 || subtotal > 0) {
                                 aggregation[poKey].amount += poAmount;
                                 aggregation[poKey].subtotal += poSubtotal;
-                                aggregation[poKey].count += 1;
+                                aggregation[poKey].count += quantity;
                             }
                         }
                     } else {
-                        const key = `${productName}|||${selectedGroup}`;
+                        const key = `${productId}|||${variation}|||${selectedGroup}`;
                         if (!aggregation[key]) {
-                            aggregation[key] = { product: productName, group: selectedGroup, amount: 0, subtotal: 0, count: 0, ratio: 100, isDivided: false };
+                            aggregation[key] = { 
+                                product: productName, 
+                                productId: productId,
+                                variation: variation,
+                                group: selectedGroup, 
+                                amount: 0, 
+                                subtotal: 0, 
+                                count: 0, 
+                                ratio: 100, 
+                                isDivided: false 
+                            };
                         }
                         if (amount > 0 || subtotal > 0) {
                             aggregation[key].amount += amount;
                             aggregation[key].subtotal += subtotal;
-                            aggregation[key].count += 1;
+                            aggregation[key].count += quantity;
                         }
                     }
                 });
@@ -1866,7 +2655,7 @@
         function displayResults() {
             const transferFee = parseFloat(document.getElementById('transferFee').value) || 0;
             
-            // 最新月を特定
+            // 最新月を計算
             const allMonthsSet = new Set();
             csvData.forEach(row => {
                 const rawDate = (row['注文日時'] || '').split(' ')[0];
@@ -1875,27 +2664,12 @@
                 const monthStr = dateStr.substring(0, 7);
                 allMonthsSet.add(monthStr);
             });
-            
             const allMonths = Array.from(allMonthsSet).sort();
             const latestMonth = allMonths[allMonths.length - 1] || '';
             
-            // 最新月のresultsのみをフィルタ
-            const latestMonthResults = results.filter(result => {
-                // このresultに対応するCSVデータの月を確認
-                const productName = result.product;
-                const hasLatestMonthData = csvData.some(row => {
-                    if (row['商品名'] !== productName) return false;
-                    const rawDate = (row['注文日時'] || '').split(' ')[0];
-                    if (!rawDate) return false;
-                    const dateStr = rawDate.replace(/\//g, '-');
-                    const monthStr = dateStr.substring(0, 7);
-                    return monthStr === latestMonth;
-                });
-                return hasLatestMonthData;
-            });
-            
-            // 最新月のみで再集計
-            const latestMonthData = csvData.filter(row => {
+            // 最新月のデータで完全に再集計（ショップフィルター適用）
+            const filteredData = filterDataByShop(csvData, 'results');
+            const latestMonthData = filteredData.filter(row => {
                 const rawDate = (row['注文日時'] || '').split(' ')[0];
                 if (!rawDate) return false;
                 const dateStr = rawDate.replace(/\//g, '-');
@@ -1903,21 +2677,34 @@
                 return monthStr === latestMonth;
             });
             
-            // 最新月のデータで集計し直す
-            const latestAggregation = {};
+            const aggregation = {};
             latestMonthData.forEach(row => {
                 const productName = row['商品名'];
+                const productId = row['商品ID'];
+                const variation = row['バリエーション名'] || '';
                 const amount = parseFloat(row['受取金額']) || 0;
                 const subtotal = parseFloat(row['小計']) || 0;
-                const selectedGroup = productGroups[productName] || 1;
-                const safeId = productName.replace(/[^a-zA-Z0-9]/g, '_');
-                const ratioCheckbox = document.getElementById(`ratio_${safeId}`);
+                const quantity = parseInt(row['数量']) || 1;
                 
-                const isRatioEnabled = ratioCheckbox && ratioCheckbox.classList.contains('active');
+                let selectedGroup = productIdGroups[productId];
+                if (selectedGroup === undefined) {
+                    selectedGroup = productGroups[productName] || 1;
+                }
                 
-                if (isRatioEnabled) {
-                    const ratio = productRatios[productName] || 50;
-                    // 端数をぽぽに寄せる：ぽを先に計算し、残りをぽぽに
+                const isRatioEnabled = productIdRatioEnabled[productId] === true;
+                const varKey = `${productId}_${variation}`;
+                const hasVariationRatio = variationRatios[varKey] !== undefined;
+                
+                if (isRatioEnabled || hasVariationRatio) {
+                    let ratio;
+                    if (hasVariationRatio) {
+                        ratio = variationRatios[varKey];
+                    } else if (productIdRatios[productId] !== undefined) {
+                        ratio = productIdRatios[productId];
+                    } else {
+                        ratio = productRatios[productName] || 50;
+                    }
+                    
                     const poAmount = Math.floor(amount * ((100 - ratio) / 100));
                     const popoAmount = amount - poAmount;
                     const poSubtotal = Math.floor(subtotal * ((100 - ratio) / 100));
@@ -1925,49 +2712,43 @@
                     
                     if (popoAmount > 0 || popoSubtotal > 0) {
                         const popoKey = `${productName}|||1`;
-                        if (!latestAggregation[popoKey]) {
-                            latestAggregation[popoKey] = { product: productName, group: 1, amount: 0, subtotal: 0, count: 0, ratio: ratio, isDivided: true };
+                        if (!aggregation[popoKey]) {
+                            aggregation[popoKey] = { product: productName, group: 1, amount: 0, subtotal: 0, count: 0, ratio: ratio, isDivided: true };
                         }
-                        if (amount > 0 || subtotal > 0) {
-                            latestAggregation[popoKey].amount += popoAmount;
-                            latestAggregation[popoKey].subtotal += popoSubtotal;
-                            latestAggregation[popoKey].count += 1;
-                        }
+                        aggregation[popoKey].amount += popoAmount;
+                        aggregation[popoKey].subtotal += popoSubtotal;
+                        aggregation[popoKey].count += quantity;
                     }
                     
                     if (poAmount > 0 || poSubtotal > 0) {
                         const poKey = `${productName}|||2`;
-                        if (!latestAggregation[poKey]) {
-                            latestAggregation[poKey] = { product: productName, group: 2, amount: 0, subtotal: 0, count: 0, ratio: 100 - ratio, isDivided: true };
+                        if (!aggregation[poKey]) {
+                            aggregation[poKey] = { product: productName, group: 2, amount: 0, subtotal: 0, count: 0, ratio: 100 - ratio, isDivided: true };
                         }
-                        if (amount > 0 || subtotal > 0) {
-                            latestAggregation[poKey].amount += poAmount;
-                            latestAggregation[poKey].subtotal += poSubtotal;
-                            latestAggregation[poKey].count += 1;
-                        }
+                        aggregation[poKey].amount += poAmount;
+                        aggregation[poKey].subtotal += poSubtotal;
+                        aggregation[poKey].count += quantity;
                     }
                 } else {
                     const key = `${productName}|||${selectedGroup}`;
-                    if (!latestAggregation[key]) {
-                        latestAggregation[key] = { product: productName, group: selectedGroup, amount: 0, subtotal: 0, count: 0, ratio: 100, isDivided: false };
+                    if (!aggregation[key]) {
+                        aggregation[key] = { product: productName, group: selectedGroup, amount: 0, subtotal: 0, count: 0, ratio: 100, isDivided: false };
                     }
-                    if (amount > 0 || subtotal > 0) {
-                        latestAggregation[key].amount += amount;
-                        latestAggregation[key].subtotal += subtotal;
-                        latestAggregation[key].count += 1;
-                    }
+                    aggregation[key].amount += amount;
+                    aggregation[key].subtotal += subtotal;
+                    aggregation[key].count += quantity;
                 }
             });
             
-            const latestResultsArray = Object.values(latestAggregation)
+            const latestMonthResults = Object.values(aggregation)
                 .filter(r => r.amount > 0 || r.subtotal > 0)
                 .sort((a, b) => {
                     if (a.group !== b.group) return a.group - b.group;
                     return b.amount - a.amount;
                 });
             
-            const group1Results = latestResultsArray.filter(r => r.group === 1);
-            const group2Results = latestResultsArray.filter(r => r.group === 2);
+            const group1Results = latestMonthResults.filter(r => r.group === 1);
+            const group2Results = latestMonthResults.filter(r => r.group === 2);
 
             const group1Total = group1Results.reduce((sum, r) => sum + r.amount, 0);
             const group2Total = group2Results.reduce((sum, r) => sum + r.amount, 0);
@@ -1988,9 +2769,9 @@
             const group1Ratio = grandTotal > 0 ? group1Total / grandTotal : 0;
             const group2Ratio = grandTotal > 0 ? group2Total / grandTotal : 0;
             
-            // 振込手数料を分配（端数はぽぽに寄せる）
-            const group2Fee = Math.floor(transferFee * group2Ratio);
-            const group1Fee = transferFee - group2Fee; // 残りをぽぽに
+            // 振込手数料はぽぽが全額負担
+            const group1Fee = transferFee;
+            const group2Fee = 0;
             
             const group1Net = group1Total - group1Fee;
             const group2Net = group2Total - group2Fee;
@@ -2004,7 +2785,7 @@
             const summaryCards = document.getElementById('summaryCards');
             summaryCards.innerHTML = `
                 <div class="result-card">
-                    <h3>ぽぽ${latestMonth ? `（${latestMonth}）` : ''}</h3>
+                    <h3>ぽぽ（${latestMonth}）</h3>
                     <div class="result-amount">¥${Math.floor(group1Net).toLocaleString()}</div>
                     <div ${dividerStyle}></div>
                     <div ${rowStyle}><span ${labelStyle}>売上合計（手数料前）</span><span ${valueStyle}>¥${Math.floor(group1Subtotal).toLocaleString()}</span></div>
@@ -2020,7 +2801,7 @@
                     <button onclick="downloadGroupCSV(1)" ${cardStyle}>CSVを保存</button>
                 </div>
                 <div class="result-card">
-                    <h3>ぽ${latestMonth ? `（${latestMonth}）` : ''}</h3>
+                    <h3>ぽ（${latestMonth}）</h3>
                     <div class="result-amount">¥${Math.floor(group2Net).toLocaleString()}</div>
                     <div ${dividerStyle}></div>
                     <div ${rowStyle}><span ${labelStyle}>売上合計（手数料前）</span><span ${valueStyle}>¥${Math.floor(group2Subtotal).toLocaleString()}</span></div>
@@ -2030,13 +2811,13 @@
                     <div ${rowStyle}><span ${labelStyle}>販売件数</span><span ${valueStyle}>${group2Count}件</span></div>
                     <div ${rowStyle}><span ${labelStyle}>商品数</span><span ${valueStyle}>${group2Results.length}商品</span></div>
                     <div ${rowStyle}><span ${labelStyle}>売上割合</span><span ${valueStyle}>${(group2Ratio * 100).toFixed(1)}%</span></div>
-                    <div ${rowStyle}><span ${labelStyle}>振込手数料</span><span ${valueStyle}>-¥${Math.floor(group2Fee).toLocaleString()}</span></div>
                     <div ${dividerStyle}></div>
                     <div ${rowStyle}><span ${labelStyle}>受取金額</span><span style="font-weight:700; font-size:1.05em;">¥${Math.floor(group2Net).toLocaleString()}</span></div>
                     <button onclick="downloadGroupCSV(2)" ${cardStyle}>CSVを保存</button>
+                    <button onclick="generateInvoice('${latestMonth}', 2)" style="margin-top: 10px; padding: 10px 20px; background: #ADE0EE; color: white; border: 2px solid white; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%;">請求書を生成</button>
                 </div>
                 <div class="result-card">
-                    <h3>総合計${latestMonth ? `（${latestMonth}）` : ''}</h3>
+                    <h3>総合計（${latestMonth}）</h3>
                     <div class="result-amount">¥${Math.floor(grandTotal - transferFee).toLocaleString()}</div>
                     <div ${dividerStyle}></div>
                     <div ${rowStyle}><span ${labelStyle}>売上合計（手数料前）</span><span ${valueStyle}>¥${Math.floor(grandSubtotal).toLocaleString()}</span></div>
@@ -2052,35 +2833,9 @@
                 </div>
             `;
             
-            // 詳細テーブル
-            let tableHTML = `
-                <thead>
-                    <tr>
-                        <th>グループ</th>
-                        <th>商品名</th>
-                        <th>分配割合</th>
-                        <th>販売数</th>
-                        <th>受取金額合計</th>
-                    </tr>
-                </thead>
-                <tbody>
-            `;
+            // 詳細テーブルを描画
+            renderDetailsTable();
             
-            results.forEach(result => {
-                const ratioText = result.isDivided ? `${result.ratio}%` : '100%';
-                tableHTML += `
-                    <tr>
-                        <td>${result.group === 1 ? 'ぽぽ' : 'ぽ'}</td>
-                        <td class="clickable-product" onclick="showProductDetail('${result.product.replace(/'/g, "\\'")}', ${result.group})">${result.product}</td>
-                        <td>${ratioText}</td>
-                        <td>${result.count}件</td>
-                        <td class="amount-cell">¥${Math.floor(result.amount).toLocaleString()}</td>
-                    </tr>
-                `;
-            });
-            
-            tableHTML += '</tbody>';
-            document.getElementById('detailsTable').innerHTML = tableHTML;
             document.getElementById('results').style.display = 'block';
 
             // 日別売上を計算・準備
@@ -2106,7 +2861,8 @@
         function prepareDailySales() {
             // 最新月のデータのみで日別売上を計算
             const allMonthData = {};
-            csvData.forEach(row => {
+            const filteredData = filterDataByShop(csvData, 'daily');
+            filteredData.forEach(row => {
                 const rawDate = (row['注文日時'] || '').split(' ')[0];
                 if (!rawDate) return;
                 const dateStr = rawDate.replace(/\//g, '-');
@@ -2121,22 +2877,41 @@
             
             // 日別集計
             const dailyData = {};
+            
             latestMonthRows.forEach(row => {
                 const productName = row['商品名'];
+                const productId = row['商品ID'];
+                const variation = row['バリエーション名'] || '';
                 const amount = parseFloat(row['受取金額']) || 0;
                 const subtotal = parseFloat(row['小計']) || 0;
                 const rawDate = (row['注文日時'] || '').split(' ')[0];
                 if (!rawDate) return;
                 const dateStr = rawDate.replace(/\//g, '-');
                 
-                const selectedGroup = productGroups[productName] || 1;
-                const safeId = productName.replace(/[^a-zA-Z0-9]/g, '_');
-                const ratioEl = document.getElementById(`ratio_${safeId}`);
-                const isRatioEnabled = ratioEl && ratioEl.classList.contains('active');
+                // 商品IDベースでグループを取得
+                let selectedGroup = productIdGroups[productId];
+                if (selectedGroup === undefined) {
+                    selectedGroup = productGroups[productName] || 1;
+                }
+                
+                // 利益分配が有効かどうかを判定
+                const isRatioEnabled = productIdRatioEnabled[productId] === true;
+                
+                // バリエーション別設定をチェック
+                const varKey = `${productId}_${variation}`;
+                const hasVariationRatio = variationRatios[varKey] !== undefined;
                 
                 let popoAmt = 0, poAmt = 0, popoSub = 0, poSub = 0;
-                if (isRatioEnabled) {
-                    const ratio = productRatios[productName] || 50;
+                if (isRatioEnabled || hasVariationRatio) {
+                    let ratio;
+                    if (hasVariationRatio) {
+                        ratio = variationRatios[varKey];
+                    } else if (productIdRatios[productId] !== undefined) {
+                        ratio = productIdRatios[productId];
+                    } else {
+                        ratio = productRatios[productName] || 50;
+                    }
+                    
                     // 端数をぽぽに寄せる：ぽを先に計算し、残りをぽぽに
                     poAmt = Math.floor(amount * ((100 - ratio) / 100));
                     popoAmt = amount - poAmt;
@@ -2177,21 +2952,21 @@
                 const totalSub = popoSub + poSub;
                 
                 popoHTML += `<div class="daily-sales-item">
-                    <span class="daily-sales-date">${date}</span>
+                    <span class="daily-sales-date" onclick="showDailySalesDetail('${date}', 1)" style="cursor:pointer; text-decoration:underline;">${date}</span>
                     <span class="daily-sales-amount">
                         <div>手数料前: ¥${popoSub.toLocaleString()}</div>
                         <div style="font-weight:700; color:#73C2FB;">受取: ¥${popo.toLocaleString()}</div>
                     </span>
                 </div>`;
                 poHTML += `<div class="daily-sales-item">
-                    <span class="daily-sales-date">${date}</span>
+                    <span class="daily-sales-date" onclick="showDailySalesDetail('${date}', 2)" style="cursor:pointer; text-decoration:underline;">${date}</span>
                     <span class="daily-sales-amount">
                         <div>手数料前: ¥${poSub.toLocaleString()}</div>
                         <div style="font-weight:700; color:#ADE0EE;">受取: ¥${po.toLocaleString()}</div>
                     </span>
                 </div>`;
                 totalHTML += `<div class="daily-sales-item">
-                    <span class="daily-sales-date">${date}</span>
+                    <span class="daily-sales-date" onclick="showDailySalesDetail('${date}', 0)" style="cursor:pointer; text-decoration:underline;">${date}</span>
                     <span class="daily-sales-amount">
                         <div>手数料前: ¥${totalSub.toLocaleString()}</div>
                         <div style="font-weight:700; color:#5AB3F5;">受取: ¥${total.toLocaleString()}</div>
@@ -2344,22 +3119,25 @@
                 return;
             }
             
-            // ユーザー識別コードごとに購入回数と合計金額を集計
+            // ユーザー識別コードごとに購入アイテム数と合計金額を集計
             const userStats = {};
             csvData.forEach(row => {
                 const userCode = row['ユーザー識別コード'];
                 const amount = parseFloat(row['受取金額']) || 0;
+                const quantity = parseInt(row['数量']) || 1; // 購入数量
                 const productName = row['商品名'];
                 
                 if (userCode) {
                     if (!userStats[userCode]) {
                         userStats[userCode] = {
-                            count: 0,
+                            itemCount: 0, // アイテム数（数量を加算）
+                            orderCount: 0, // 注文回数
                             totalAmount: 0,
                             products: []
                         };
                     }
-                    userStats[userCode].count += 1;
+                    userStats[userCode].itemCount += quantity; // 数量を加算
+                    userStats[userCode].orderCount += 1;
                     userStats[userCode].totalAmount += amount;
                     if (!userStats[userCode].products.includes(productName)) {
                         userStats[userCode].products.push(productName);
@@ -2367,16 +3145,17 @@
                 }
             });
             
-            // リピーター（2回以上）のみ抽出して購入回数順にソート
+            // リピーター（2回以上購入）のみ抽出してアイテム数順にソート
             const repeaters = Object.keys(userStats)
-                .filter(code => userStats[code].count >= 2)
+                .filter(code => userStats[code].orderCount >= 2)
                 .map(code => ({
                     code,
-                    count: userStats[code].count,
+                    itemCount: userStats[code].itemCount,
+                    orderCount: userStats[code].orderCount,
                     totalAmount: userStats[code].totalAmount,
                     products: userStats[code].products
                 }))
-                .sort((a, b) => b.count - a.count);
+                .sort((a, b) => b.itemCount - a.itemCount); // アイテム数でソート
             
             document.getElementById('repeaterCount').textContent = repeaters.length.toLocaleString();
             
@@ -2389,7 +3168,8 @@
             let tableHTML = '<thead style="position:sticky; top:0; background:#73C2FB; color:white; z-index:10;"><tr>';
             tableHTML += '<th style="padding:12px; text-align:left; border-bottom:2px solid white; font-weight:600;">順位</th>';
             tableHTML += '<th style="padding:12px; text-align:left; border-bottom:2px solid white; font-weight:600;">ユーザー識別コード</th>';
-            tableHTML += '<th style="padding:12px; text-align:center; border-bottom:2px solid white; font-weight:600;">購入回数</th>';
+            tableHTML += '<th style="padding:12px; text-align:center; border-bottom:2px solid white; font-weight:600;">購入アイテム数</th>';
+            tableHTML += '<th style="padding:12px; text-align:center; border-bottom:2px solid white; font-weight:600;">注文回数</th>';
             tableHTML += '<th style="padding:12px; text-align:right; border-bottom:2px solid white; font-weight:600;">合計金額</th>';
             tableHTML += '<th style="padding:12px; text-align:center; border-bottom:2px solid white; font-weight:600;">購入商品数</th>';
             tableHTML += '<th style="padding:12px; text-align:left; border-bottom:2px solid white; font-weight:600;">購入商品</th>';
@@ -2402,7 +3182,8 @@
                 tableHTML += `<tr style="background:${bgColor};">`;
                 tableHTML += `<td style="padding:10px 12px; border-bottom:1px solid #eee; font-weight:600; color:#73C2FB;">${rank}</td>`;
                 tableHTML += `<td style="padding:10px 12px; border-bottom:1px solid #eee; font-family:monospace;">${user.code}</td>`;
-                tableHTML += `<td style="padding:10px 12px; border-bottom:1px solid #eee; text-align:center; font-weight:600;">${user.count}回</td>`;
+                tableHTML += `<td style="padding:10px 12px; border-bottom:1px solid #eee; text-align:center; font-weight:700; color:#73C2FB;">${user.itemCount}個</td>`;
+                tableHTML += `<td style="padding:10px 12px; border-bottom:1px solid #eee; text-align:center;">${user.orderCount}回</td>`;
                 tableHTML += `<td style="padding:10px 12px; border-bottom:1px solid #eee; text-align:right;">¥${Math.floor(user.totalAmount).toLocaleString()}</td>`;
                 tableHTML += `<td style="padding:10px 12px; border-bottom:1px solid #eee; text-align:center;">${user.products.length}種類</td>`;
                 tableHTML += `<td style="padding:10px 12px; border-bottom:1px solid #eee; font-size:0.85em; max-width:400px; white-space:normal;">${productsList}</td>`;
@@ -3032,6 +3813,444 @@
             });
         }
         // ====== グラフ関連ここまで ======
+        
+        // ====== モーダル関連 ======
+        function closeModal(event) {
+            if (!event || event.target.id === 'detailModal') {
+                document.getElementById('detailModal').style.display = 'none';
+            }
+        }
+        
+        function showDailySalesDetail(date, group) {
+            // その日のデータを取得（ショップフィルター適用）
+            const filteredData = filterDataByShop(csvData, 'daily');
+            const dayData = filteredData.filter(row => {
+                const rawDate = (row['注文日時'] || '').split(' ')[0];
+                if (!rawDate) return false;
+                const dateStr = rawDate.replace(/\//g, '-');
+                return dateStr === date;
+            });
+            
+            if (dayData.length === 0) {
+                alert('その日のデータがありません');
+                return;
+            }
+            
+            const groupName = group === 1 ? 'ぽぽ' : group === 2 ? 'ぽ' : '全体';
+            
+            // 商品ごとに集計（グループ別）
+            const productSales = {};
+            dayData.forEach(row => {
+                const productName = row['商品名'];
+                const productId = row['商品ID'];
+                const variation = row['バリエーション名'] || '';
+                const amount = parseFloat(row['受取金額']) || 0;
+                const subtotal = parseFloat(row['小計']) || 0;
+                
+                // 商品IDベースでグループを取得
+                let selectedGroup = productIdGroups[productId];
+                if (selectedGroup === undefined) {
+                    selectedGroup = productGroups[productName] || 1;
+                }
+                
+                // 利益分配が有効かどうかを判定
+                const isRatioEnabled = productIdRatioEnabled[productId] === true;
+                
+                // バリエーション別設定をチェック
+                const varKey = `${productId}_${variation}`;
+                const hasVariationRatio = variationRatios[varKey] !== undefined;
+                
+                let includeThis = false;
+                let displayAmount = 0;
+                let displaySubtotal = 0;
+                
+                if (group === 0) {
+                    // 全体の場合は全て表示
+                    includeThis = true;
+                    displayAmount = amount;
+                    displaySubtotal = subtotal;
+                } else if (isRatioEnabled || hasVariationRatio) {
+                    let ratio;
+                    if (hasVariationRatio) {
+                        ratio = variationRatios[varKey];
+                    } else if (productIdRatios[productId] !== undefined) {
+                        ratio = productIdRatios[productId];
+                    } else {
+                        ratio = productRatios[productName] || 50;
+                    }
+                    
+                    if (group === 1) {
+                        // ぽぽ
+                        const popoRatio = ratio;
+                        if (popoRatio > 0) {
+                            includeThis = true;
+                            displayAmount = amount - Math.floor(amount * ((100 - ratio) / 100));
+                            displaySubtotal = subtotal - Math.floor(subtotal * ((100 - ratio) / 100));
+                        }
+                    } else {
+                        // ぽ
+                        const poRatio = 100 - ratio;
+                        if (poRatio > 0) {
+                            includeThis = true;
+                            displayAmount = Math.floor(amount * ((100 - ratio) / 100));
+                            displaySubtotal = Math.floor(subtotal * ((100 - ratio) / 100));
+                        }
+                    }
+                } else {
+                    if (selectedGroup === group) {
+                        includeThis = true;
+                        displayAmount = amount;
+                        displaySubtotal = subtotal;
+                    }
+                }
+                
+                if (includeThis) {
+                    if (!productSales[productName]) {
+                        productSales[productName] = { count: 0, amount: 0, subtotal: 0 };
+                    }
+                    productSales[productName].count += 1;
+                    productSales[productName].amount += displayAmount;
+                    productSales[productName].subtotal += displaySubtotal;
+                }
+            });
+            
+            // HTMLを生成
+            let html = `<div style="margin-bottom:15px; padding:15px; background:#f8f9fa; border-radius:8px;">
+                <p style="margin:0; color:#666;">対象: <strong>${groupName}</strong>　合計販売数: <strong>${Object.keys(productSales).length > 0 ? Object.values(productSales).reduce((s, p) => s + p.count, 0) : 0}件</strong></p>
+            </div>`;
+            
+            if (Object.keys(productSales).length === 0) {
+                html += '<p style="text-align:center; padding:20px; color:#999;">該当する商品がありません</p>';
+            } else {
+                html += '<table style="width:100%; border-collapse:collapse;">';
+                html += '<thead><tr style="background:#73C2FB; color:white;">';
+                html += '<th style="padding:12px; text-align:left; border-bottom:2px solid white;">商品名</th>';
+                html += '<th style="padding:12px; text-align:center; border-bottom:2px solid white;">販売数</th>';
+                html += '<th style="padding:12px; text-align:right; border-bottom:2px solid white;">手数料前</th>';
+                html += '<th style="padding:12px; text-align:right; border-bottom:2px solid white;">受取金額</th>';
+                html += '</tr></thead><tbody>';
+                
+                Object.keys(productSales).sort((a, b) => productSales[b].amount - productSales[a].amount).forEach((product, index) => {
+                    const data = productSales[product];
+                    const bgColor = index % 2 === 0 ? '#ffffff' : '#f8f9fa';
+                    html += `<tr style="background:${bgColor};">`;
+                    html += `<td style="padding:10px; border-bottom:1px solid #eee;">${product}</td>`;
+                    html += `<td style="padding:10px; border-bottom:1px solid #eee; text-align:center;">${data.count}件</td>`;
+                    html += `<td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">¥${Math.floor(data.subtotal).toLocaleString()}</td>`;
+                    html += `<td style="padding:10px; border-bottom:1px solid #eee; text-align:right; font-weight:600;">¥${Math.floor(data.amount).toLocaleString()}</td>`;
+                    html += '</tr>';
+                });
+                
+                html += '</tbody></table>';
+            }
+            
+            document.getElementById('modalTitle').textContent = date + ' の売上詳細（' + groupName + '）';
+            document.getElementById('modalBody').innerHTML = html;
+            document.getElementById('detailModal').style.display = 'flex';
+        }
+        
+        let currentInvoiceData = null; // グローバル変数として保持
+        
+        function generateInvoice(month, group) {
+            // 指定月のデータを取得
+            const monthData = csvData.filter(row => {
+                const rawDate = (row['注文日時'] || '').split(' ')[0];
+                if (!rawDate) return false;
+                const dateStr = rawDate.replace(/\//g, '-');
+                const monthStr = dateStr.substring(0, 7);
+                return monthStr === month;
+            });
+            
+            if (monthData.length === 0) {
+                alert('指定月のデータがありません');
+                return;
+            }
+            
+            // グループ2（ぽ）の金額を計算
+            let totalAmount = 0;
+            
+            monthData.forEach(row => {
+                const productId = row['商品ID'];
+                const variation = row['バリエーション名'] || '';
+                const amount = parseFloat(row['受取金額']) || 0;
+                
+                // 商品IDベースでグループを取得
+                let selectedGroup = productIdGroups[productId];
+                if (selectedGroup === undefined) {
+                    const productName = row['商品名'];
+                    selectedGroup = productGroups[productName] || 1;
+                }
+                
+                const isRatioEnabled = productIdRatioEnabled[productId] === true;
+                const varKey = `${productId}_${variation}`;
+                const hasVariationRatio = variationRatios[varKey] !== undefined;
+                
+                if (isRatioEnabled || hasVariationRatio) {
+                    let ratio;
+                    if (hasVariationRatio) {
+                        ratio = variationRatios[varKey];
+                    } else if (productIdRatios[productId] !== undefined) {
+                        ratio = productIdRatios[productId];
+                    } else {
+                        ratio = 50;
+                    }
+                    
+                    const poAmount = Math.floor(amount * ((100 - ratio) / 100));
+                    totalAmount += poAmount;
+                } else {
+                    if (selectedGroup === 2) {
+                        totalAmount += amount;
+                    }
+                }
+            });
+            
+            // 前回の入力値を復元
+            document.getElementById('invoiceRecipientModal').value = document.getElementById('invoiceRecipient').value || '';
+            document.getElementById('invoiceYearMonthModal').value = month;
+            document.getElementById('invoiceAmountModal').value = Math.floor(totalAmount);
+            document.getElementById('invoiceIssuerModal').value = document.getElementById('invoiceIssuer').value || '';
+            document.getElementById('invoiceAddressModal').value = document.getElementById('invoiceAddress').value || '';
+            document.getElementById('invoiceBankModal').value = document.getElementById('invoiceBank').value || '';
+            
+            // 支払期限のデフォルト値（30日後）
+            const savedDueDate = document.getElementById('invoiceDueDate').value;
+            if (savedDueDate) {
+                document.getElementById('invoiceDueDateModal').value = savedDueDate;
+            } else {
+                const today = new Date();
+                today.setDate(today.getDate() + 30);
+                const defaultDueDate = today.toISOString().split('T')[0];
+                document.getElementById('invoiceDueDateModal').value = defaultDueDate;
+            }
+            
+            // モーダルを表示
+            document.getElementById('invoiceInputModal').style.display = 'flex';
+        }
+        
+        function closeInvoiceModal(event) {
+            if (!event || event.target.id === 'invoiceInputModal') {
+                document.getElementById('invoiceInputModal').style.display = 'none';
+            }
+        }
+        
+        function submitInvoiceInfo() {
+            const recipient = document.getElementById('invoiceRecipientModal').value.trim();
+            const yearMonth = document.getElementById('invoiceYearMonthModal').value.trim();
+            const amount = parseInt(document.getElementById('invoiceAmountModal').value) || 0;
+            const issuer = document.getElementById('invoiceIssuerModal').value.trim();
+            const address = document.getElementById('invoiceAddressModal').value.trim();
+            const bank = document.getElementById('invoiceBankModal').value.trim();
+            const dueDate = document.getElementById('invoiceDueDateModal').value.trim();
+            
+            if (!recipient || !yearMonth || !amount || !issuer || !address || !bank || !dueDate) {
+                alert('全ての項目を入力してください');
+                return;
+            }
+            
+            // 年月の形式チェック (YYYY-MM)
+            if (!/^\d{4}-\d{2}$/.test(yearMonth)) {
+                alert('年月はYYYY-MM形式で入力してください（例：2026-02）');
+                return;
+            }
+            
+            // 支払期限の形式チェック (YYYY-MM-DD)
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+                alert('支払期限はYYYY-MM-DD形式で入力してください（例：2026-03-31）');
+                return;
+            }
+            
+            // 入力値を保存
+            document.getElementById('invoiceRecipient').value = recipient;
+            document.getElementById('invoiceIssuer').value = issuer;
+            document.getElementById('invoiceAddress').value = address;
+            document.getElementById('invoiceBank').value = bank;
+            document.getElementById('invoiceDueDate').value = dueDate;
+            
+            // モーダルを閉じる
+            closeInvoiceModal();
+            
+            // 請求書を生成
+            generateSimpleInvoicePDF(recipient, yearMonth, amount, issuer, address, bank, dueDate);
+        }
+        
+        function generateSimpleInvoicePDF(recipient, yearMonth, amount, issuer, address, bank, dueDate) {
+            // 年月を解析
+            const [year, monthNum] = yearMonth.split('-');
+            const monthInt = parseInt(monthNum);
+            
+            // 日付計算
+            const today = new Date();
+            const issueDate = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
+            
+            // 支払期限を日本語形式に変換
+            const [dueYear, dueMonth, dueDay] = dueDate.split('-');
+            const dueDateStr = `${parseInt(dueYear)}年${parseInt(dueMonth)}月${parseInt(dueDay)}日`;
+            
+            // 請求書HTML生成
+            let invoiceHTML = `
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>請求書 - ${year}年${monthInt}月</title>
+    <style>
+        @media print {
+            .no-print { display: none; }
+            @page { margin: 20mm; }
+        }
+        body { 
+            font-family: 'MS Gothic', 'Meiryo', sans-serif; 
+            line-height: 1.6;
+            padding: 20px;
+            max-width: 900px; 
+            margin: 0 auto;
+            font-size: 14px;
+        }
+        .header { text-align: center; margin-bottom: 30px; }
+        .title { font-size: 26px; font-weight: bold; margin-bottom: 15px; }
+        .recipient { text-align: left; margin-bottom: 25px; font-size: 18px; }
+        .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
+        .section { margin: 25px 0; }
+        .section-title { 
+            font-weight: bold; 
+            border-bottom: 2px solid #333; 
+            padding-bottom: 5px; 
+            margin-bottom: 12px;
+            font-size: 15px;
+        }
+        .amount { font-size: 22px; font-weight: bold; text-align: right; }
+        .print-btn { 
+            margin: 15px 0; 
+            padding: 12px 25px; 
+            font-size: 15px; 
+            background: #73C2FB; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+        }
+        .print-btn:hover { background: #5AB3F5; }
+        .content-line {
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <button class="print-btn no-print" onclick="window.print()">印刷 / PDF保存</button>
+    
+    <div class="header">
+        <div class="title">請　求　書</div>
+    </div>
+    
+    <div class="recipient">
+        ${recipient} 様
+    </div>
+    
+    <div class="info-row">
+        <div>発行日：${issueDate}</div>
+        <div>請求番号：${year}${monthNum}</div>
+    </div>
+    
+    <div class="section">
+        <div class="section-title">請求金額</div>
+        <div class="amount">¥${Math.floor(amount).toLocaleString()}</div>
+    </div>
+    
+    <div class="section">
+        <div class="section-title">取引内容</div>
+        <div class="content-line">${year}年${monthInt}月分 イラスト制作費</div>
+    </div>
+    
+    <div class="section">
+        <div class="section-title">振込先</div>
+        <p>${bank}</p>
+    </div>
+    
+    <div class="section">
+        <div class="section-title">支払期限</div>
+        <p>${dueDateStr}</p>
+    </div>
+    
+    <div class="section" style="margin-top:40px;">
+        <div class="section-title">発行者</div>
+        <p style="margin:5px 0;">${issuer}</p>
+        <p style="margin:5px 0; font-size:13px; color:#666;">${address}</p>
+    </div>
+</body>
+</html>
+            `;
+            
+            const newWindow = window.open('', '_blank');
+            newWindow.document.write(invoiceHTML);
+            newWindow.document.close();
+        }
+        
     </script>
+    
+    <!-- モーダルダイアログ -->
+    <div id="detailModal" class="modal-overlay" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3 id="modalTitle" style="margin:0; color:#333;"></h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+    
+    <!-- 請求書情報入力モーダル -->
+    <div id="invoiceInputModal" class="modal-overlay" onclick="closeInvoiceModal(event)" style="display:none;">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width:600px;">
+            <div class="modal-header">
+                <h3 style="margin:0; color:#333;">請求書情報入力</h3>
+                <button class="modal-close" onclick="closeInvoiceModal()">&times;</button>
+            </div>
+            <div style="padding:10px 0;">
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:8px; color:#666; font-weight:600;">宛名</label>
+                    <input type="text" id="invoiceRecipientModal" placeholder="例：山田太郎" 
+                           style="width:100%; padding:12px; border:1px solid #ddd; border-radius:6px; font-size:16px;">
+                </div>
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:8px; color:#666; font-weight:600;">年月（YYYY-MM形式）</label>
+                    <input type="text" id="invoiceYearMonthModal" placeholder="例：2026-02" 
+                           style="width:100%; padding:12px; border:1px solid #ddd; border-radius:6px; font-size:16px;">
+                </div>
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:8px; color:#666; font-weight:600;">請求金額（円）</label>
+                    <input type="number" id="invoiceAmountModal" placeholder="例：50000" 
+                           style="width:100%; padding:12px; border:1px solid #ddd; border-radius:6px; font-size:16px;">
+                </div>
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:8px; color:#666; font-weight:600;">発行者名</label>
+                    <input type="text" id="invoiceIssuerModal" placeholder="例：田中花子" 
+                           style="width:100%; padding:12px; border:1px solid #ddd; border-radius:6px; font-size:16px;">
+                </div>
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:8px; color:#666; font-weight:600;">発行者住所</label>
+                    <input type="text" id="invoiceAddressModal" placeholder="例：東京都〇〇区..." 
+                           style="width:100%; padding:12px; border:1px solid #ddd; border-radius:6px; font-size:16px;">
+                </div>
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:8px; color:#666; font-weight:600;">振込先銀行</label>
+                    <input type="text" id="invoiceBankModal" placeholder="例：〇〇銀行 △△支店 普通 1234567" 
+                           style="width:100%; padding:12px; border:1px solid #ddd; border-radius:6px; font-size:16px;">
+                </div>
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:8px; color:#666; font-weight:600;">支払期限（YYYY-MM-DD形式）</label>
+                    <input type="date" id="invoiceDueDateModal" 
+                           style="width:100%; padding:12px; border:1px solid #ddd; border-radius:6px; font-size:16px;">
+                </div>
+                <div style="display:flex; gap:10px; margin-top:25px;">
+                    <button onclick="closeInvoiceModal()" style="flex:1; padding:12px; background:#ccc; color:white; border:none; border-radius:6px; cursor:pointer; font-size:16px;">キャンセル</button>
+                    <button onclick="submitInvoiceInfo()" style="flex:1; padding:12px; background:#73C2FB; color:white; border:none; border-radius:6px; cursor:pointer; font-size:16px; font-weight:600;">請求書を生成</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
